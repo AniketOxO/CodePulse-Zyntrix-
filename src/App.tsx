@@ -1,627 +1,1078 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import { motion, AnimatePresence } from "motion/react";
-import { 
-  Activity, 
-  Brain, 
-  CheckCircle2, 
-  Github, 
-  Gitlab, 
-  Layout, 
-  MessageSquare, 
-  ShieldCheck, 
-  Zap, 
-  Menu, 
-  X,
-  ChevronRight,
-  BarChart3,
-  Users,
+﻿import { useMemo, useState } from "react";
+import {
   ArrowRight,
-  Lock,
-  Globe,
-  Code2,
-  Cpu,
-  Sparkles,
-  TrendingUp,
-  Clock,
-  AlertCircle
+  ChartNoAxesCombined,
+  FolderGit2,
+  GitCommitHorizontal,
+  Github,
+  LayoutDashboard,
+  LogOut,
+  Settings,
 } from "lucide-react";
-import { useState, useEffect } from "react";
 
-const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+type AppView = "home" | "auth" | "dashboard" | "repositories";
 
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-black/80 backdrop-blur-xl border-b border-white/5 py-3" : "bg-transparent py-5"}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3 group cursor-pointer">
-            <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(34,197,94,0.3)] group-hover:scale-110 transition-transform duration-300">
-              <Zap className="text-black w-6 h-6 fill-current" />
-            </div>
-            <span className="text-2xl font-bold tracking-tighter font-display">CodePulse</span>
-          </div>
-          
-          <div className="hidden md:flex items-center gap-10">
-            {["Features", "Integrations", "Pricing", "Docs"].map((item) => (
-              <a 
-                key={item} 
-                href={`#${item.toLowerCase()}`} 
-                className="text-sm font-medium text-zinc-400 hover:text-white transition-colors relative group"
-              >
-                {item}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand transition-all duration-300 group-hover:w-full" />
-              </a>
-            ))}
-          </div>
-
-          <div className="hidden md:flex items-center gap-6">
-            <button className="text-sm font-semibold text-zinc-400 hover:text-white transition-colors">Sign in</button>
-            <button className="bg-brand text-black px-6 py-2.5 rounded-full text-sm font-bold hover:bg-brand/90 transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
-              Start Free Trial
-            </button>
-          </div>
-
-          <div className="md:hidden">
-            <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-zinc-400 hover:text-white transition-colors">
-              {isOpen ? <X size={28} /> : <Menu size={28} />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-black/95 backdrop-blur-2xl border-b border-white/5 overflow-hidden"
-          >
-            <div className="px-4 py-8 space-y-6">
-              {["Features", "Integrations", "Pricing", "Docs"].map((item) => (
-                <a key={item} href={`#${item.toLowerCase()}`} className="block text-lg font-medium text-zinc-400 hover:text-brand transition-colors">
-                  {item}
-                </a>
-              ))}
-              <div className="pt-6 flex flex-col gap-4">
-                <button className="w-full py-3 text-zinc-400 font-medium">Sign in</button>
-                <button className="w-full bg-brand text-black py-3 rounded-xl font-bold">Start Free Trial</button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
-  );
+type SidebarItem = {
+  id: "dashboard" | "commits" | "analytics" | "repositories" | "settings" | "logout";
+  label: string;
 };
 
-const Hero = () => {
-  return (
-    <section className="relative pt-40 pb-32 overflow-hidden">
-      {/* Background Elements */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-brand/10 blur-[120px] rounded-full opacity-50" />
-        <div className="absolute top-[20%] right-[10%] w-[400px] h-[400px] bg-emerald-500/5 blur-[100px] rounded-full" />
-        <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-      </div>
+type HomeIconKey =
+  | "signal"
+  | "vault"
+  | "pipeline"
+  | "forecast"
+  | "automation"
+  | "team";
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-sm">
-            <Sparkles className="w-4 h-4 text-brand" />
-            <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Now with AI Burnout Prediction</span>
-          </div>
-          
-          <h1 className="text-6xl md:text-8xl font-bold tracking-tighter mb-8 leading-[0.9]">
-            Scale Your Team,<br />
-            <span className="text-brand italic font-display">Not Their Stress</span>
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-zinc-400 max-w-3xl mx-auto mb-12 leading-relaxed font-light">
-            Analyze developer velocity and patterns without the micromanagement. 
-            CodePulse predicts burnout before it happens, keeping your engineers happy and your codebase healthy.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <button className="group relative w-full sm:w-auto bg-brand text-black px-10 py-5 rounded-2xl text-lg font-bold hover:bg-brand/90 transition-all shadow-[0_0_30px_rgba(34,197,94,0.3)] overflow-hidden">
-              <span className="relative z-10 flex items-center gap-2">
-                Start Analyzing for Free <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </span>
-              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-            </button>
-            <button className="w-full sm:w-auto bg-white/5 border border-white/10 px-10 py-5 rounded-2xl text-lg font-bold hover:bg-white/10 transition-all backdrop-blur-sm">
-              Book a Demo
-            </button>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6, duration: 1 }}
-          className="mt-32"
-        >
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-zinc-500 mb-12">Trusted by the world's best engineering teams</p>
-          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-30 grayscale hover:grayscale-0 transition-all duration-700">
-            {["Vercel", "Stripe", "Airbnb", "OpenAI", "Slack", "Github"].map((brand) => (
-              <div key={brand} className="flex items-center gap-2 font-bold text-2xl tracking-tighter hover:text-white transition-colors cursor-default">
-                <div className="w-6 h-6 bg-zinc-700 rounded-sm" /> {brand}
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
+type HomeFeature = {
+  title: string;
+  text: string;
+  icon: HomeIconKey;
 };
 
-const FeatureBento = () => {
+type DashboardSignal = {
+  label: string;
+  value: string;
+  delta: string;
+  tone: "up" | "steady" | "watch";
+};
+
+type PartnerLogo = {
+  name: string;
+  icon: string;
+};
+
+const heroSignals = [
+  { label: "Teams onboarded", value: "2,180+" },
+  { label: "Insights generated monthly", value: "4.1M" },
+  { label: "Average release confidence lift", value: "+39%" },
+];
+
+const homeFeatures: HomeFeature[] = [
+  {
+    title: "Signal Clarity Engine",
+    text: "Turn noisy commit streams into board-ready engineering intelligence in real time.",
+    icon: "signal",
+  },
+  {
+    title: "Secure Data Vault",
+    text: "Enterprise-grade repository access controls with encrypted sync and audit-ready logs.",
+    icon: "vault",
+  },
+  {
+    title: "Delivery Flow Mapping",
+    text: "Visualize bottlenecks from PR open to merge and optimize cycle-time before sprint close.",
+    icon: "pipeline",
+  },
+  {
+    title: "Predictive Release AI",
+    text: "Forecast timeline risk and confidence levels from real team velocity and review behavior.",
+    icon: "forecast",
+  },
+  {
+    title: "Automated Governance",
+    text: "Trigger quality alerts and policy checks automatically when engineering patterns drift.",
+    icon: "automation",
+  },
+  {
+    title: "Team Benchmark Matrix",
+    text: "Compare squads fairly with normalized metrics across quality, throughput, and consistency.",
+    icon: "team",
+  },
+];
+
+const workflowSteps = [
+  {
+    title: "Connect your stack",
+    text: "Securely connect GitHub repositories and teams with scoped, role-based access.",
+  },
+  {
+    title: "Set success metrics",
+    text: "Define objectives for cycle-time, review speed, reliability, and delivery confidence.",
+  },
+  {
+    title: "Operate with precision",
+    text: "Use live recommendations to remove bottlenecks and improve every sprint outcome.",
+  },
+];
+
+const impactStats = [
+  { label: "Release confidence", value: "94%" },
+  { label: "PR turnaround", value: "-31%" },
+  { label: "Delivery throughput", value: "+46%" },
+  { label: "Planning accuracy", value: "9.4 / 10" },
+];
+
+const partnerLogos: PartnerLogo[] = [
+  { name: "Google", icon: "google" },
+  { name: "Microsoft", icon: "microsoft" },
+  { name: "Amazon", icon: "amazon" },
+  { name: "Meta", icon: "meta" },
+  { name: "Netflix", icon: "netflix" },
+  { name: "Stripe", icon: "stripe" },
+  { name: "Shopify", icon: "shopify" },
+  { name: "Atlassian", icon: "atlassian" },
+  { name: "Cloudflare", icon: "cloudflare" },
+  { name: "Notion", icon: "notion" },
+  { name: "Slack", icon: "slack" },
+  { name: "Spotify", icon: "spotify" },
+];
+
+const platformPillars = [
+  {
+    title: "Leadership Command View",
+    text: "Unified visibility across delivery health, release confidence, and execution risk across all engineering teams.",
+    points: ["Portfolio-level reporting", "Executive-ready weekly summaries", "Real-time delivery alerts"],
+  },
+  {
+    title: "Team Operations Layer",
+    text: "Operational dashboards for EMs and tech leads to optimize review flow, cycle-time, and sprint throughput.",
+    points: ["Team-by-team benchmarks", "Workflow bottleneck detection", "Quality trend monitoring"],
+  },
+  {
+    title: "Developer Experience Insights",
+    text: "Connect daily activity to measurable outcomes so teams improve consistency without adding reporting overhead.",
+    points: ["Commit and PR intelligence", "Streak and momentum tracking", "Contextual recommendation engine"],
+  },
+];
+
+const useCases = [
+  {
+    title: "For Engineering Leaders",
+    text: "Forecast roadmap confidence with real delivery signals and allocate resources before risk compounds.",
+  },
+  {
+    title: "For Managers and Leads",
+    text: "Identify review bottlenecks, rebalance workload, and improve sprint execution with actionable team metrics.",
+  },
+  {
+    title: "For Platform and DevOps",
+    text: "Track governance adherence, monitor quality drift, and standardize engineering excellence across repositories.",
+  },
+];
+
+const trustSignals = [
+  { label: "SOC 2 Type II ready", value: "Security controls aligned" },
+  { label: "SAML / SSO", value: "Enterprise identity compatible" },
+  { label: "Audit-grade logs", value: "Every sync and action recorded" },
+  { label: "Data encryption", value: "At rest and in transit" },
+];
+
+const faqItems = [
+  {
+    q: "How quickly can we launch CodePulse in production?",
+    a: "Most teams connect repositories, define metrics, and launch a first executive dashboard within one business day.",
+  },
+  {
+    q: "Does CodePulse replace existing engineering tools?",
+    a: "No. CodePulse sits on top of your existing stack and unifies operational insight for leadership and delivery teams.",
+  },
+  {
+    q: "Can large organizations segment data by team or business unit?",
+    a: "Yes. Multi-team workspace segmentation and role-based access allow enterprise organizations to scale safely.",
+  },
+];
+
+const dashboardSignals: DashboardSignal[] = [
+  { label: "Engineering health", value: "93 / 100", delta: "+6.8%", tone: "up" },
+  { label: "Cycle-time score", value: "8.7 / 10", delta: "+1.2 pts", tone: "up" },
+  { label: "Code quality index", value: "91%", delta: "Stable", tone: "steady" },
+  { label: "Risk alerts", value: "03", delta: "Needs review", tone: "watch" },
+];
+
+const statsCards = [
+  { label: "Total commits", value: "1,845" },
+  { label: "Active days", value: "24" },
+  { label: "Current streak", value: "11 days" },
+  { label: "Sprint velocity", value: "82 pts" },
+];
+
+const weeklyCommits = [
+  { week: "W1", commits: 52 },
+  { week: "W2", commits: 68 },
+  { week: "W3", commits: 44 },
+  { week: "W4", commits: 75 },
+  { week: "W5", commits: 81 },
+  { week: "W6", commits: 58 },
+  { week: "W7", commits: 72 },
+  { week: "W8", commits: 87 },
+];
+
+const codingHours = [3.2, 4.8, 5.4, 4.1, 6.2, 5.7, 4.9];
+
+const languageUsage = [
+  { name: "TypeScript", value: 42 },
+  { name: "JavaScript", value: 28 },
+  { name: "Python", value: 18 },
+  { name: "CSS", value: 12 },
+];
+
+const repositories = [
+  { name: "SmartDev", commits: 120, language: "JavaScript" },
+  { name: "ChatApp", commits: 89, language: "Node.js" },
+  { name: "Portfolio", commits: 45, language: "React" },
+  { name: "API-Toolkit", commits: 61, language: "TypeScript" },
+  { name: "DevOps-Flow", commits: 33, language: "Shell" },
+];
+
+const teamHealth = [
+  { name: "Platform", score: "96", trend: "Strong" },
+  { name: "Frontend", score: "91", trend: "Improving" },
+  { name: "Data", score: "88", trend: "Stable" },
+  { name: "Infra", score: "86", trend: "Needs focus" },
+];
+
+const activityFeed = [
+  "Platform merged a critical release PR in 1.6h review time.",
+  "Frontend reduced reopen rate by 22% this sprint.",
+  "Infra cycle-time alert triggered for two repositories.",
+  "Data team hit a 14-day consistency streak.",
+];
+
+const contributionMatrix: number[][] = [
+  [0, 2, 3, 1, 2, 3, 0],
+  [1, 2, 0, 0, 3, 2, 1],
+  [0, 3, 2, 1, 2, 3, 0],
+  [2, 2, 1, 0, 3, 1, 0],
+  [1, 3, 2, 2, 3, 2, 1],
+  [0, 2, 1, 0, 2, 3, 2],
+  [1, 2, 3, 1, 2, 2, 0],
+  [0, 1, 2, 3, 2, 1, 0],
+];
+
+const sidebarItems: SidebarItem[] = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "commits", label: "Commits" },
+  { id: "analytics", label: "Analytics" },
+  { id: "repositories", label: "Repositories" },
+  { id: "settings", label: "Settings" },
+  { id: "logout", label: "Logout" },
+];
+
+function HomeFeatureIcon({ icon }: { icon: HomeIconKey }) {
+  if (icon === "signal") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M4 17.5h16" />
+        <path d="M6.5 14l3.2-3.2 2.8 2.8 5-5" />
+        <path d="M16.7 5.6H20v3.3" />
+      </svg>
+    );
+  }
+
+  if (icon === "vault") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <rect x="4.2" y="5" width="15.6" height="14" rx="2.5" />
+        <circle cx="12" cy="12" r="2.8" />
+        <path d="M12 9.3v5.4" />
+      </svg>
+    );
+  }
+
+  if (icon === "pipeline") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <rect x="3.8" y="4.5" width="5.4" height="5.4" rx="1.1" />
+        <rect x="14.8" y="4.5" width="5.4" height="5.4" rx="1.1" />
+        <rect x="9.3" y="14.2" width="5.4" height="5.4" rx="1.1" />
+        <path d="M9.2 7.2h5.6" />
+        <path d="M12 10v4.2" />
+      </svg>
+    );
+  }
+
+  if (icon === "forecast") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M4.2 18.2h15.6" />
+        <path d="M6.1 16.1c1.3-4.3 3.8-6.4 7.3-6.4 2.1 0 3.7.7 4.9 2.3" />
+        <path d="M15.8 8.1H20v4.2" />
+      </svg>
+    );
+  }
+
+  if (icon === "automation") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <path d="M11.9 3.8v3.1" />
+        <path d="M11.9 17.1v3.1" />
+        <path d="M3.8 12h3.1" />
+        <path d="M17.1 12h3.1" />
+        <circle cx="12" cy="12" r="4.1" />
+      </svg>
+    );
+  }
+
   return (
-    <section id="features" className="py-32 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-20 text-center max-w-3xl mx-auto">
-          <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">Insight, not oversight.</h2>
-          <p className="text-zinc-400 text-lg">We provide the metrics that matter for a healthy engineering culture, without the invasive tracking.</p>
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="8" cy="8" r="2.5" />
+      <circle cx="16" cy="8" r="2.5" />
+      <circle cx="12" cy="16" r="2.5" />
+      <path d="M10.3 9.8 11.1 13" />
+      <path d="M13.7 9.8 12.9 13" />
+    </svg>
+  );
+}
+
+function BrandMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M5.2 7.6a6.4 6.4 0 0 1 6.4-6.4h4.8v4.1h-4.8a2.3 2.3 0 1 0 0 4.6h3.6v4.2h-3.6a6.4 6.4 0 0 1-6.4-6.5z" />
+      <path d="M18.8 16.4a6.4 6.4 0 0 1-6.4 6.4H7.6v-4.1h4.8a2.3 2.3 0 0 0 0-4.6H8.8V9.9h3.6a6.4 6.4 0 0 1 6.4 6.5z" />
+    </svg>
+  );
+}
+
+function HomePage({ onConnect }: { onConnect: () => void }) {
+  return (
+    <div className="home-page">
+      <span className="ambient-shape ambient-a" aria-hidden />
+      <span className="ambient-shape ambient-b" aria-hidden />
+
+      <header className="landing-navbar" id="home">
+        <a className="logo-wrap" href="#home">
+          <div className="logo-badge">
+            <BrandMark />
+          </div>
+          <span>CodePulse</span>
+        </a>
+
+        <nav className="nav-links">
+          <a href="#platform">Platform</a>
+          <a href="#solutions">Solutions</a>
+          <a href="#security">Security</a>
+          <a href="#faq">Resources</a>
+        </nav>
+
+        <div className="nav-actions">
+          <a className="btn btn-ghost" href="#cta">
+            Book demo
+          </a>
+          <button className="btn btn-primary btn-elevated" onClick={onConnect}>
+            <Github size={16} />
+            Connect GitHub
+          </button>
         </div>
+      </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Large Card */}
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="md:col-span-2 p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/5 relative overflow-hidden group"
-          >
-            <div className="relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-brand/10 flex items-center justify-center mb-8 group-hover:bg-brand/20 transition-colors">
-                <Activity className="text-brand w-6 h-6" />
-              </div>
-              <h3 className="text-3xl font-bold mb-4">Predictive Burnout Analysis</h3>
-              <p className="text-zinc-400 text-lg max-w-md leading-relaxed">
-                Our AI models analyze commit patterns, PR cycle times, and communication frequency to detect early signs of developer fatigue before it impacts your team.
-              </p>
-              
-              <div className="mt-12 p-6 rounded-2xl bg-black/40 border border-white/5 max-w-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Team Health Score</span>
-                  <span className="text-brand font-bold">92%</span>
-                </div>
-                <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    whileInView={{ width: "92%" }}
-                    transition={{ duration: 1.5, ease: "easeOut" }}
-                    className="h-full bg-brand" 
-                  />
-                </div>
-                <div className="mt-4 flex items-center gap-2 text-xs text-zinc-500">
-                  <TrendingUp className="w-3 h-3 text-brand" />
-                  <span>+4% from last sprint</span>
-                </div>
-              </div>
-            </div>
-            {/* Decorative Gradient */}
-            <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-brand/5 to-transparent pointer-events-none" />
-          </motion.div>
-
-          {/* Small Card 1 */}
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/5 group"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-brand/10 flex items-center justify-center mb-8 group-hover:bg-brand/20 transition-colors">
-              <Code2 className="text-brand w-6 h-6" />
-            </div>
-            <h3 className="text-2xl font-bold mb-4">Knowledge Silo Detection</h3>
-            <p className="text-zinc-400 leading-relaxed">
-              Identify areas of your codebase where only one person has context, helping you prioritize knowledge sharing.
+      <main className="landing-main">
+        <section className="hero-section">
+          <div className="hero-copy">
+            <p className="eyebrow">Enterprise Engineering Intelligence Platform</p>
+            <h1>Give leadership and invidual one trusted system for delivery clarity.</h1>
+            <p>
+              CodePulse brings commits, pull requests, review behavior, and governance
+              into a unified intelligence layer so organizations ship with higher
+              confidence and fewer execution surprises.
             </p>
-          </motion.div>
-
-          {/* Small Card 2 */}
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/5 group"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-brand/10 flex items-center justify-center mb-8 group-hover:bg-brand/20 transition-colors">
-              <Clock className="text-brand w-6 h-6" />
-            </div>
-            <h3 className="text-2xl font-bold mb-4">Cycle Time Optimization</h3>
-            <p className="text-zinc-400 leading-relaxed">
-              Track the time from first commit to production. Identify bottlenecks in your review process and deployment pipeline.
-            </p>
-          </motion.div>
-
-          {/* Medium Card */}
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="md:col-span-2 p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/5 relative overflow-hidden group"
-          >
-            <div className="relative z-10 flex flex-col md:flex-row gap-10 items-center">
-              <div className="flex-1">
-                <div className="w-12 h-12 rounded-2xl bg-brand/10 flex items-center justify-center mb-8 group-hover:bg-brand/20 transition-colors">
-                  <Cpu className="text-brand w-6 h-6" />
-                </div>
-                <h3 className="text-3xl font-bold mb-4">Deep Contextual Metrics</h3>
-                <p className="text-zinc-400 text-lg leading-relaxed">
-                  We don't just count commits. We understand the complexity of changes, the impact on the codebase, and the cognitive load required.
-                </p>
-              </div>
-              <div className="flex-1 w-full grid grid-cols-4 gap-2 items-end h-32">
-                {[40, 70, 50, 90, 60, 80, 45, 100].map((h, i) => (
-                  <motion.div 
-                    key={i}
-                    initial={{ height: 0 }}
-                    whileInView={{ height: `${h}%` }}
-                    transition={{ delay: i * 0.1 }}
-                    className={`rounded-t-lg ${i % 2 === 0 ? 'bg-brand/40' : 'bg-brand'}`} 
-                  />
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const Integrations = () => {
-  const integrations = [
-    { name: "GitHub", icon: <Github className="w-8 h-8" />, color: "bg-zinc-800" },
-    { name: "GitLab", icon: <Gitlab className="w-8 h-8" />, color: "bg-orange-600/20 text-orange-500" },
-    { name: "Bitbucket", icon: <Zap className="w-8 h-8" />, color: "bg-blue-600/20 text-blue-500" },
-    { name: "Slack", icon: <MessageSquare className="w-8 h-8" />, color: "bg-emerald-600/20 text-emerald-500" },
-    { name: "Jira", icon: <BarChart3 className="w-8 h-8" />, color: "bg-blue-500/20 text-blue-400" },
-    { name: "Linear", icon: <Layout className="w-8 h-8" />, color: "bg-indigo-500/20 text-indigo-400" }
-  ];
-
-  return (
-    <section id="integrations" className="py-32 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-24 items-center">
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/20 mb-6">
-              <Globe className="w-3 h-3 text-brand" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-brand">Global Connectivity</span>
-            </div>
-            <h2 className="text-5xl md:text-6xl font-bold mb-8 tracking-tighter">Connects where you code.</h2>
-            <p className="text-zinc-400 text-xl mb-10 leading-relaxed font-light">
-              Integrates in seconds with your existing CI/CD pipeline. No agents to install, no manual logging. We connect via OAuth and start analyzing history immediately.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {[
-                { title: "SOC2 Type II", desc: "Enterprise-grade security standards." },
-                { title: "Read-Only", desc: "We never modify your source code." },
-                { title: "Zero Config", desc: "Connect and get insights in minutes." },
-                { title: "Multi-Cloud", desc: "Works with AWS, GCP, and Azure." }
-              ].map((item, i) => (
-                <div key={i} className="flex gap-4">
-                  <div className="mt-1 w-5 h-5 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="w-3 h-3 text-brand" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-zinc-200">{item.title}</h4>
-                    <p className="text-sm text-zinc-500">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {integrations.map((item, i) => (
-              <motion.div 
-                key={i}
-                whileHover={{ scale: 1.05, y: -5 }}
-                className="p-10 rounded-3xl bg-zinc-900/50 border border-white/5 flex flex-col items-center justify-center gap-6 hover:bg-zinc-900 hover:border-brand/30 transition-all cursor-pointer group shadow-xl"
-              >
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${item.color} group-hover:glow transition-all duration-500`}>
-                  {item.icon}
-                </div>
-                <span className="font-bold text-sm tracking-tight">{item.name}</span>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const Pricing = () => {
-  const plans = [
-    {
-      name: "Starter",
-      price: "$0",
-      desc: "For small teams and open source projects.",
-      features: ["Up to 5 developers", "30-day history", "Basic burnout alerts", "GitHub integration"],
-      cta: "Get Started",
-      popular: false
-    },
-    {
-      name: "Pro",
-      price: "$49",
-      period: "/dev/mo",
-      desc: "For growing engineering organizations.",
-      features: ["Unlimited developers", "Unlimited history", "Advanced AI burnout prediction", "All integrations", "Custom dashboards"],
-      cta: "Start 14-day Trial",
-      popular: true
-    },
-    {
-      name: "Enterprise",
-      price: "Custom",
-      desc: "For large-scale organizations with complex needs.",
-      features: ["SSO & SAML", "Dedicated account manager", "Custom data retention", "On-premise options", "SLA guarantees"],
-      cta: "Contact Sales",
-      popular: false
-    }
-  ];
-
-  return (
-    <section id="pricing" className="py-32 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-20">
-          <h2 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight">Simple, transparent pricing.</h2>
-          <p className="text-zinc-400 text-lg">Choose the plan that's right for your team's size and stage.</p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {plans.map((plan, i) => (
-            <motion.div 
-              key={i}
-              whileHover={{ y: -10 }}
-              className={`p-10 rounded-[2.5rem] border flex flex-col ${plan.popular ? 'bg-brand/5 border-brand/30 relative' : 'bg-zinc-900/50 border-white/5'}`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-brand text-black text-[10px] font-bold uppercase tracking-widest px-4 py-1.5 rounded-full">
-                  Most Popular
-                </div>
-              )}
-              <div className="mb-8">
-                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-5xl font-bold tracking-tighter">{plan.price}</span>
-                  {plan.period && <span className="text-zinc-500 text-sm">{plan.period}</span>}
-                </div>
-                <p className="text-zinc-500 text-sm leading-relaxed">{plan.desc}</p>
-              </div>
-              
-              <ul className="space-y-4 mb-10 flex-1">
-                {plan.features.map((feature, j) => (
-                  <li key={j} className="flex items-center gap-3 text-sm text-zinc-300">
-                    <CheckCircle2 className="w-4 h-4 text-brand flex-shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-
-              <button className={`w-full py-4 rounded-2xl font-bold transition-all ${plan.popular ? 'bg-brand text-black hover:bg-brand/90 shadow-[0_0_20px_rgba(34,197,94,0.2)]' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
-                {plan.cta}
+            <ul className="hero-value-list">
+              <li>Built for engineering organizations from startup to enterprise scale</li>
+              <li>Actionable analytics for executives, managers, and delivery teams</li>
+              <li>Fast setup with secure GitHub integration and role-based controls</li>
+            </ul>
+            <div className="hero-actions">
+              <button className="btn btn-primary btn-elevated" onClick={onConnect}>
+                <Github size={16} />
+                Start free integration
               </button>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const DashboardPreview = () => {
-  return (
-    <section className="py-32 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-5xl md:text-7xl font-bold mb-6 tracking-tighter">Powerful Dashboards</h2>
-        <p className="text-zinc-400 text-xl mb-20 max-w-2xl mx-auto font-light">Everything you need to know about your team's pulse, in one beautiful interface.</p>
-        
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 1 }}
-          className="relative mx-auto max-w-6xl group"
-        >
-          <div className="bg-zinc-900 rounded-[2rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] overflow-hidden">
-            {/* Browser Header */}
-            <div className="bg-zinc-800/80 px-6 py-4 border-b border-white/5 flex items-center gap-6">
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500/30" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/30" />
-                <div className="w-3 h-3 rounded-full bg-green-500/30" />
-              </div>
-              <div className="flex-1 bg-black/40 rounded-lg py-1.5 text-xs text-zinc-500 font-mono tracking-tight border border-white/5">
-                app.codepulse.io/team-pulse
-              </div>
-              <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-zinc-700/50" />
-              </div>
+              <a className="btn btn-ghost" href="#preview">
+                Explore product tour
+              </a>
             </div>
-            
-            {/* Dashboard Content */}
-            <div className="p-10 bg-gradient-to-b from-zinc-900 to-black">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-                {[
-                  { label: "Active Devs", val: "24", change: "+2", icon: <Users className="w-4 h-4" /> },
-                  { label: "Cycle Time", val: "2.4d", change: "-12%", icon: <Clock className="w-4 h-4" /> },
-                  { label: "PR Throughput", val: "142", change: "+14%", icon: <Code2 className="w-4 h-4" /> },
-                  { label: "Burnout Risk", val: "Low", change: "Stable", icon: <AlertCircle className="w-4 h-4" /> }
-                ].map((stat, i) => (
-                  <div key={i} className="p-6 rounded-2xl bg-zinc-800/30 border border-white/5 text-left">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-zinc-400">
-                        {stat.icon}
-                      </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stat.change.startsWith('+') ? 'bg-brand/10 text-brand' : 'bg-zinc-700/30 text-zinc-400'}`}>
-                        {stat.change}
-                      </span>
-                    </div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">{stat.label}</p>
-                    <p className="text-2xl font-bold tracking-tight">{stat.val}</p>
-                  </div>
-                ))}
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2 h-80 rounded-2xl bg-zinc-800/30 border border-white/5 p-8 flex flex-col">
-                  <div className="flex items-center justify-between mb-8">
-                    <h4 className="text-sm font-bold text-zinc-300">Team Velocity</h4>
-                    <div className="flex gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-brand" />
-                        <span className="text-[10px] text-zinc-500">Current</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-brand/30" />
-                        <span className="text-[10px] text-zinc-500">Previous</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 flex items-end gap-4">
-                    {[30, 50, 40, 70, 60, 45, 90, 65, 80, 55, 75, 100].map((h, i) => (
-                      <motion.div 
-                        key={i}
-                        initial={{ height: 0 }}
-                        whileInView={{ height: `${h}%` }}
-                        transition={{ delay: i * 0.05, duration: 0.8 }}
-                        className={`flex-1 rounded-t-lg ${i % 2 === 0 ? 'bg-brand/80' : 'bg-brand/40'}`} 
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="h-80 rounded-2xl bg-zinc-800/30 border border-white/5 p-8 flex flex-col">
-                  <h4 className="text-sm font-bold text-zinc-300 mb-8 text-left">Burnout Risk Distribution</h4>
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="relative w-40 h-40">
-                      <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="12" />
-                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="#22c55e" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset="50.24" strokeLinecap="round" />
-                      </svg>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-bold">80%</span>
-                        <span className="text-[8px] font-bold uppercase text-zinc-500">Healthy</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="hero-signal-grid">
+              {heroSignals.map((signal) => (
+                <article key={signal.label}>
+                  <p>{signal.label}</p>
+                  <strong>{signal.value}</strong>
+                </article>
+              ))}
             </div>
           </div>
-          
-          {/* Decorative Glow */}
-          <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 w-full h-60 bg-brand/10 blur-[120px] -z-10 opacity-50" />
-        </motion.div>
-      </div>
-    </section>
-  );
-};
 
-const Footer = () => {
-  return (
-    <footer className="py-32 border-t border-white/5 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-12 mb-24">
-          <div className="col-span-2">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-                <Zap className="text-black w-5 h-5 fill-current" />
-              </div>
-              <span className="text-2xl font-bold tracking-tighter font-display">CodePulse</span>
+          <aside className="hero-console" id="preview">
+            <div className="console-header">
+              <span>Executive Snapshot</span>
+              <span className="status-dot">Synced</span>
             </div>
-            <p className="text-zinc-500 text-lg leading-relaxed mb-10 max-w-xs font-light">
-              The modern engineering intelligence platform built for developer well-being and productivity.
+
+            <div className="console-grid">
+              <article className="console-card">
+                <p>Release confidence</p>
+                <strong>92%</strong>
+                <small>Up 13% this sprint</small>
+              </article>
+              <article className="console-card">
+                <p>Review cycle time</p>
+                <strong>3.4h</strong>
+                <small>Faster than target</small>
+              </article>
+              <article className="console-card wide">
+                <p>Weekly engineering momentum</p>
+                <div className="mini-bars" aria-hidden>
+                  {[38, 50, 44, 67, 61, 74, 88].map((height) => (
+                    <span key={height} style={{ height: `${height}%` }} />
+                  ))}
+                </div>
+              </article>
+            </div>
+
+            <div className="console-tracks">
+              {[
+                { label: "Cycle-time stability", value: 86 },
+                { label: "Review quality confidence", value: 91 },
+                { label: "Planning predictability", value: 79 },
+              ].map((row) => (
+                <div key={row.label} className="track-row">
+                  <p>{row.label}</p>
+                  <div>
+                    <em style={{ width: `${row.value}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="console-foot">
+              {[ ["Merged PRs", "148"], ["High-risk repos", "4"], ["Quality score", "9.1"] ].map(
+                ([label, value]) => (
+                  <div key={label}>
+                    <p>{label}</p>
+                    <strong>{value}</strong>
+                  </div>
+                ),
+              )}
+            </div>
+          </aside>
+        </section>
+
+        <section className="proof-strip" aria-label="Popular engineering ecosystems">
+          <p>Built for teams using tools from</p>
+          <div className="logo-marquee">
+            <div className="logo-track">
+              {[...partnerLogos, ...partnerLogos].map((company, index) => (
+                <span className="logo-chip" key={`${company.name}-${index}`}>
+                  <img
+                    className="company-logo"
+                    src={`https://cdn.simpleicons.org/${company.icon}`}
+                    alt={`${company.name} logo`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="platform-section" id="platform">
+          <div className="section-title">
+            <h2>One platform, three operational layers for modern software organizations</h2>
+            <p>
+              CodePulse is designed to align strategy, execution, and engineering quality
+              with measurable outcomes from day one.
             </p>
-            <div className="flex gap-6">
-              {["Github", "Twitter", "LinkedIn", "Discord"].map((social) => (
-                <a key={social} href="#" className="text-zinc-500 hover:text-white transition-colors">
-                  <span className="text-xs font-bold uppercase tracking-widest">{social}</span>
-                </a>
-              ))}
-            </div>
-          </div>
-          
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-300 mb-8">Product</h4>
-            <ul className="space-y-6 text-sm text-zinc-500">
-              {["Features", "Integrations", "Pricing", "Changelog", "Security"].map((item) => (
-                <li key={item}><a href="#" className="hover:text-brand transition-colors">{item}</a></li>
-              ))}
-            </ul>
           </div>
 
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-300 mb-8">Resources</h4>
-            <ul className="space-y-6 text-sm text-zinc-500">
-              {["Documentation", "API Reference", "Blog", "Community", "Guides"].map((item) => (
-                <li key={item}><a href="#" className="hover:text-brand transition-colors">{item}</a></li>
-              ))}
-            </ul>
+          <div className="pillar-grid">
+            {platformPillars.map((pillar) => (
+              <article key={pillar.title} className="pillar-card">
+                <h3>{pillar.title}</h3>
+                <p>{pillar.text}</p>
+                <ul>
+                  {pillar.points.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="features-section" id="solutions">
+          <div className="section-title">
+            <h2>Core capabilities that scale with growing engineering complexity</h2>
+            <p>
+              From predictive release intelligence to automated governance, each module
+              is built to improve delivery quality and execution confidence.
+            </p>
           </div>
 
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-300 mb-8">Company</h4>
-            <ul className="space-y-6 text-sm text-zinc-500">
-              {["About", "Careers", "News", "Contact", "Legal"].map((item) => (
-                <li key={item}><a href="#" className="hover:text-brand transition-colors">{item}</a></li>
-              ))}
-            </ul>
+          <div className="features-grid">
+            {homeFeatures.map((item) => (
+              <article key={item.title} className="feature-card">
+                <div className="feature-icon-wrap">
+                  <HomeFeatureIcon icon={item.icon} />
+                </div>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="workflow-section" id="process">
+          <div className="section-title">
+            <h2>Deployment model built for speed, governance, and enterprise adoption</h2>
           </div>
 
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-300 mb-8">Support</h4>
-            <ul className="space-y-6 text-sm text-zinc-500">
-              {["Help Center", "Status", "Contact Us", "Feedback"].map((item) => (
-                <li key={item}><a href="#" className="hover:text-brand transition-colors">{item}</a></li>
+          <div className="workflow-layout">
+            <ol className="workflow-list">
+              {workflowSteps.map((step, index) => (
+                <li key={step.title}>
+                  <span className="step-index">{String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <h3>{step.title}</h3>
+                    <p>{step.text}</p>
+                  </div>
+                </li>
               ))}
-            </ul>
-          </div>
-        </div>
-        
-        <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex items-center gap-4">
-            <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
-            <p className="text-xs text-zinc-600 font-medium uppercase tracking-widest">All systems operational</p>
-          </div>
-          <p className="text-xs text-zinc-600">© 2024 CodePulse Inc. Built with love for developers.</p>
-          <div className="flex gap-8 text-xs text-zinc-600 font-medium uppercase tracking-widest">
-            <a href="#" className="hover:text-zinc-400 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-zinc-400 transition-colors">Terms</a>
-            <a href="#" className="hover:text-zinc-400 transition-colors">Cookies</a>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-};
+            </ol>
 
-export default function App() {
-  return (
-    <div className="min-h-screen bg-bg">
-      <Navbar />
-      <main>
-        <Hero />
-        <FeatureBento />
-        <Integrations />
-        <DashboardPreview />
-        <Pricing />
+            <aside className="workflow-highlight">
+              <p className="panel-label">Operations note</p>
+              <h3>Live policy automation keeps engineering standards enforceable at scale.</h3>
+              <p>
+                Teams receive contextual recommendations and risk alerts before issues
+                become blockers for release or roadmap commitments.
+              </p>
+              <button className="btn btn-ghost" onClick={onConnect}>
+                Open dashboard <ArrowRight size={15} />
+              </button>
+            </aside>
+          </div>
+        </section>
+
+        <section className="usecase-section">
+          <div className="section-title">
+            <h2>Purpose-built experiences for every layer of the engineering org</h2>
+          </div>
+          <div className="usecase-grid">
+            {useCases.map((useCase) => (
+              <article key={useCase.title} className="usecase-card">
+                <h3>{useCase.title}</h3>
+                <p>{useCase.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="security-section" id="security">
+          <article className="security-main">
+            <p className="panel-label">Security and compliance</p>
+            <h3>Enterprise trust controls designed for regulated and high-scale environments.</h3>
+            <p>
+              Security is built into the platform architecture with encrypted data
+              handling, identity integration, and full audit visibility for enterprise
+              governance programs.
+            </p>
+            <a className="btn btn-ghost" href="#faq">
+              View governance details
+            </a>
+          </article>
+          <div className="trust-grid">
+            {trustSignals.map((item) => (
+              <article key={item.label}>
+                <strong>{item.label}</strong>
+                <p>{item.value}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="results-section" id="results">
+          <div className="impact-grid">
+            {impactStats.map((item) => (
+              <article key={item.label} className="impact-card">
+                <p>{item.label}</p>
+                <strong>{item.value}</strong>
+              </article>
+            ))}
+          </div>
+
+          <article className="testimonial-card">
+            <p className="panel-label">Customer voice</p>
+            <h3>
+              "We stopped reacting at sprint-end. CodePulse gives us early signals and
+              we ship with confidence."
+            </h3>
+            <span>VP Engineering, Global SaaS Team</span>
+          </article>
+        </section>
+
+        <section className="faq-section" id="faq">
+          <div className="section-title">
+            <h2>Frequently asked questions from product and engineering organizations</h2>
+          </div>
+          <div className="faq-list">
+            {faqItems.map((item) => (
+              <article key={item.q}>
+                <h3>{item.q}</h3>
+                <p>{item.a}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="cta-section" id="cta">
+          <h2>Adopt a landing experience and platform story that reflects enterprise-grade execution.</h2>
+          <p>
+            Connect GitHub, align engineering metrics to business outcomes, and give every
+            stakeholder a reliable view of delivery performance.
+          </p>
+          <div className="hero-actions">
+            <button className="btn btn-primary btn-elevated" onClick={onConnect}>
+              <Github size={16} />
+              Launch CodePulse
+            </button>
+            <a className="btn btn-ghost" href="#platform">
+              Explore platform
+            </a>
+          </div>
+        </section>
       </main>
-      <Footer />
+
+      <footer className="landing-footer">
+        <p>(c) 2026 CodePulse. Precision visibility for high-performing engineering teams.</p>
+        <div className="footer-links">
+          <a href="#home">Home</a>
+          <a href="#platform">Platform</a>
+          <a href="#solutions">Solutions</a>
+          <a href="#security">Security</a>
+          <a href="#faq">Resources</a>
+        </div>
+      </footer>
     </div>
   );
 }
+
+function AuthPage({
+  onBackHome,
+  onAuthSuccess,
+}: {
+  onBackHome: () => void;
+  onAuthSuccess: () => void;
+}) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+
+  return (
+    <div className="auth-page">
+      <span className="ambient-shape ambient-a" aria-hidden />
+      <span className="ambient-shape ambient-b" aria-hidden />
+
+      <section className="auth-shell">
+        <header className="auth-header">
+          <button className="btn btn-ghost" onClick={onBackHome}>
+            Back to home
+          </button>
+          <a
+            className="logo-wrap"
+            href="#home"
+            onClick={(event) => {
+              event.preventDefault();
+              onBackHome();
+            }}
+          >
+            <div className="logo-badge">
+              <BrandMark />
+            </div>
+            <span>CodePulse</span>
+          </a>
+        </header>
+
+        <article className="auth-card">
+          <div className="auth-intro">
+            <p className="eyebrow">GitHub access</p>
+            <h1>Log in or sign up to connect your repositories.</h1>
+            <p>
+              Authenticate your team with GitHub, then open your dashboard to start
+              tracking commits, pull requests, and delivery health.
+            </p>
+
+            <ul className="auth-benefits">
+              <li>Scoped GitHub OAuth permissions</li>
+              <li>Secure organization-level access control</li>
+              <li>Instant setup for team dashboards</li>
+            </ul>
+          </div>
+
+          <div className="auth-form-wrap">
+            <div className="auth-switch" role="tablist" aria-label="Authentication mode">
+              <button
+                type="button"
+                className={mode === "login" ? "active" : ""}
+                onClick={() => setMode("login")}
+              >
+                Log in
+              </button>
+              <button
+                type="button"
+                className={mode === "signup" ? "active" : ""}
+                onClick={() => setMode("signup")}
+              >
+                Sign up
+              </button>
+            </div>
+
+            <form
+              className="auth-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                onAuthSuccess();
+              }}
+            >
+              {mode === "signup" && (
+                <label>
+                  Full name
+                  <input type="text" placeholder="Alex Carter" required />
+                </label>
+              )}
+
+              <label>
+                Work email
+                <input type="email" placeholder="name@company.com" required />
+              </label>
+
+              <label>
+                Password
+                <input type="password" placeholder="Enter password" required />
+              </label>
+
+              {mode === "signup" && (
+                <label>
+                  Organization
+                  <input type="text" placeholder="Velocity Labs" required />
+                </label>
+              )}
+
+              <button type="submit" className="btn btn-primary btn-elevated auth-submit">
+                <Github size={16} />
+                {mode === "login" ? "Log in with GitHub" : "Sign up with GitHub"}
+              </button>
+            </form>
+
+            <button className="btn btn-ghost auth-continue" onClick={onAuthSuccess}>
+              Continue to dashboard
+            </button>
+          </div>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function DashboardPage({
+  onOpenRepositories,
+}: {
+  onOpenRepositories: () => void;
+}) {
+  const maxWeeklyCommits = Math.max(...weeklyCommits.map((entry) => entry.commits));
+  const totalCommits = weeklyCommits.reduce((sum, entry) => sum + entry.commits, 0);
+
+  const linePoints = useMemo(() => {
+    const maxHours = Math.max(...codingHours);
+    return codingHours
+      .map((hours, index) => {
+        const x = (index / (codingHours.length - 1)) * 100;
+        const y = 100 - (hours / maxHours) * 90;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  }, []);
+
+  return (
+    <div className="dashboard-page">
+      <section className="dashboard-hero">
+        <div>
+          <p className="panel-label">Execution cockpit</p>
+          <h1>Engineering Dashboard</h1>
+          <p>
+            Real-time signal across throughput, quality, and predictability so teams ship
+            faster with fewer surprises.
+          </p>
+          <div className="dashboard-hero-tags">
+            <span>Sprint 12</span>
+            <span>4 teams active</span>
+            <span>Last sync 2 min ago</span>
+          </div>
+        </div>
+        <div className="dashboard-hero-actions">
+          <button className="btn btn-primary btn-elevated" onClick={onOpenRepositories}>
+            Open repositories <ArrowRight size={15} />
+          </button>
+          <button className="btn btn-ghost">Export weekly report</button>
+        </div>
+      </section>
+
+      <section className="signal-grid">
+        {dashboardSignals.map((signal) => (
+          <article key={signal.label} className="signal-card">
+            <p>{signal.label}</p>
+            <strong>{signal.value}</strong>
+            <span className={`signal-delta ${signal.tone}`}>{signal.delta}</span>
+          </article>
+        ))}
+      </section>
+
+      <section className="stats-grid">
+        {statsCards.map((card) => (
+          <article className="panel stat-card" key={card.label}>
+            <p>{card.label}</p>
+            <strong>{card.value}</strong>
+          </article>
+        ))}
+      </section>
+
+      <section className="dashboard-grid">
+        <article className="panel chart-card commits-chart">
+          <div className="panel-head">
+            <h3>Commit momentum</h3>
+            <span>Last 8 weeks</span>
+          </div>
+          <div className="chart-summary">
+            <p>Total commits in range</p>
+            <strong>{totalCommits}</strong>
+          </div>
+          <div className="bar-chart">
+            {weeklyCommits.map((item) => (
+              <div key={item.week} className="bar-stack">
+                <span
+                  className="bar-fill"
+                  style={{ height: `${(item.commits / maxWeeklyCommits) * 100}%` }}
+                />
+                <small>{item.week}</small>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel team-card">
+          <div className="panel-head">
+            <h3>Team health matrix</h3>
+            <span>Live</span>
+          </div>
+          <div className="team-list">
+            {teamHealth.map((team) => (
+              <div key={team.name} className="team-row">
+                <div>
+                  <p>{team.name}</p>
+                  <small>{team.trend}</small>
+                </div>
+                <strong>{team.score}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel contribution-panel">
+          <div className="panel-head">
+            <h3>Contribution heatmap</h3>
+            <span>Last 8 weeks</span>
+          </div>
+          <div className="weekdays">
+            {"Mon Tue Wed Thu Fri Sat Sun".split(" ").map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+          <div className="contribution-grid" aria-label="Contribution heatmap">
+            {contributionMatrix.map((week, weekIndex) =>
+              week.map((level, dayIndex) => (
+                <span
+                  key={`${weekIndex}-${dayIndex}`}
+                  className={`heat-cell heat-${level}`}
+                  title={`Week ${weekIndex + 1}, Day ${dayIndex + 1}`}
+                />
+              )),
+            )}
+          </div>
+        </article>
+
+        <article className="panel chart-card language-chart">
+          <div className="panel-head">
+            <h3>Language distribution</h3>
+            <span>Repository mix</span>
+          </div>
+          <div className="language-list">
+            {languageUsage.map((item) => (
+              <div key={item.name} className="language-row">
+                <span>{item.name}</span>
+                <div>
+                  <em style={{ width: `${item.value}%` }} />
+                </div>
+                <strong>{item.value}%</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel chart-card coding-time-chart">
+          <div className="panel-head">
+            <h3>Coding hour trend</h3>
+            <span>Hours/day</span>
+          </div>
+          <svg viewBox="0 0 100 100" role="img" aria-label="Coding hours trend">
+            <polyline points={linePoints} />
+          </svg>
+          <div className="day-labels">
+            {"Mon Tue Wed Thu Fri Sat Sun".split(" ").map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel activity-card">
+          <div className="panel-head">
+            <h3>Activity feed</h3>
+            <span>Today</span>
+          </div>
+          <ul className="activity-list">
+            {activityFeed.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function RepositoriesPage() {
+  return (
+    <div className="repo-page">
+      <div className="dashboard-heading">
+        <h1>Repositories</h1>
+        <p>Project-level delivery pulse across active codebases.</p>
+      </div>
+
+      <section className="repo-summary-grid">
+        <article>
+          <p>Active repositories</p>
+          <strong>24</strong>
+        </article>
+        <article>
+          <p>Avg merge cycle</p>
+          <strong>4.2h</strong>
+        </article>
+        <article>
+          <p>Weekly commits</p>
+          <strong>437</strong>
+        </article>
+      </section>
+
+      <section className="panel repo-table-wrap">
+        <table className="repo-table">
+          <thead>
+            <tr>
+              <th>Repository</th>
+              <th>Commits</th>
+              <th>Primary Language</th>
+            </tr>
+          </thead>
+          <tbody>
+            {repositories.map((repo) => (
+              <tr key={repo.name}>
+                <td>{repo.name}</td>
+                <td>{repo.commits}</td>
+                <td>{repo.language}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
+}
+
+function AppShell({
+  view,
+  setView,
+}: {
+  view: AppView;
+  setView: (view: AppView) => void;
+}) {
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="logo-badge">
+            <BrandMark />
+          </div>
+          <span>CodePulse</span>
+        </div>
+
+        <div className="sidebar-workspace">
+          <p>Workspace</p>
+          <strong>Velocity Labs</strong>
+        </div>
+
+        <nav>
+          {sidebarItems.map((item) => {
+            const isActive =
+              (view === "dashboard" && ["dashboard", "commits", "analytics"].includes(item.id)) ||
+              (view === "repositories" && item.id === "repositories");
+
+            return (
+              <button
+                key={item.id}
+                className={`side-link ${isActive ? "active" : ""}`}
+                onClick={() => {
+                  if (item.id === "repositories") {
+                    setView("repositories");
+                    return;
+                  }
+                  if (item.id === "logout") {
+                    setView("home");
+                    return;
+                  }
+                  if (["dashboard", "commits", "analytics"].includes(item.id)) {
+                    setView("dashboard");
+                  }
+                }}
+              >
+                {item.id === "dashboard" && <LayoutDashboard size={16} />}
+                {item.id === "commits" && <GitCommitHorizontal size={16} />}
+                {item.id === "analytics" && <ChartNoAxesCombined size={16} />}
+                {item.id === "repositories" && <FolderGit2 size={16} />}
+                {item.id === "settings" && <Settings size={16} />}
+                {item.id === "logout" && <LogOut size={16} />}
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-note">
+          <p>GitHub connected</p>
+          <strong>Sync: 2 min ago</strong>
+        </div>
+      </aside>
+
+      <main className="dashboard-main">
+        {view === "dashboard" ? (
+          <DashboardPage onOpenRepositories={() => setView("repositories")} />
+        ) : (
+          <RepositoriesPage />
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default function App() {
+  const [view, setView] = useState<AppView>("home");
+
+  if (view === "home") {
+    return <HomePage onConnect={() => setView("auth")} />;
+  }
+
+  if (view === "auth") {
+    return <AuthPage onBackHome={() => setView("home")} onAuthSuccess={() => setView("dashboard")} />;
+  }
+
+  return <AppShell view={view} setView={setView} />;
+}
+
+
