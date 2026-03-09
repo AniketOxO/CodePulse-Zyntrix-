@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   ChartNoAxesCombined,
@@ -9,39 +9,17 @@ import {
   LogOut,
   Settings,
 } from "lucide-react";
+// at top of file
+const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
-type AppView = "home" | "auth" | "dashboard" | "repositories";
-
-type SidebarItem = {
-  id: "dashboard" | "commits" | "analytics" | "repositories" | "settings" | "logout";
-  label: string;
-};
-
-type HomeIconKey =
-  | "signal"
-  | "vault"
-  | "pipeline"
-  | "forecast"
-  | "automation"
-  | "team";
-
-type HomeFeature = {
-  title: string;
-  text: string;
-  icon: HomeIconKey;
-};
-
-type DashboardSignal = {
-  label: string;
-  value: string;
-  delta: string;
-  tone: "up" | "steady" | "watch";
-};
-
-type PartnerLogo = {
-  name: string;
-  icon: string;
-};
+function goToGithub() {
+  const redirect = encodeURIComponent(window.location.origin);
+  window.location.href =
+    `https://github.com/login/oauth/authorize` +
+    `?client_id=${CLIENT_ID}` +
+    `&scope=repo,user` +
+    `&redirect_uri=${redirect}`;
+}
 
 const heroSignals = [
   { label: "Teams onboarded", value: "2,180+" },
@@ -49,7 +27,7 @@ const heroSignals = [
   { label: "Average release confidence lift", value: "+39%" },
 ];
 
-const homeFeatures: HomeFeature[] = [
+const homeFeatures = [
   {
     title: "Signal Clarity Engine",
     text: "Turn noisy commit streams into board-ready engineering intelligence in real time.",
@@ -104,7 +82,7 @@ const impactStats = [
   { label: "Planning accuracy", value: "9.4 / 10" },
 ];
 
-const partnerLogos: PartnerLogo[] = [
+const partnerLogos = [
   { name: "Google", icon: "google" },
   { name: "Microsoft", icon: "microsoft" },
   { name: "Amazon", icon: "amazon" },
@@ -174,7 +152,7 @@ const faqItems = [
   },
 ];
 
-const dashboardSignals: DashboardSignal[] = [
+const dashboardSignals = [
   { label: "Engineering health", value: "93 / 100", delta: "+6.8%", tone: "up" },
   { label: "Cycle-time score", value: "8.7 / 10", delta: "+1.2 pts", tone: "up" },
   { label: "Code quality index", value: "91%", delta: "Stable", tone: "steady" },
@@ -230,7 +208,7 @@ const activityFeed = [
   "Data team hit a 14-day consistency streak.",
 ];
 
-const contributionMatrix: number[][] = [
+const contributionMatrix = [
   [0, 2, 3, 1, 2, 3, 0],
   [1, 2, 0, 0, 3, 2, 1],
   [0, 3, 2, 1, 2, 3, 0],
@@ -241,7 +219,7 @@ const contributionMatrix: number[][] = [
   [0, 1, 2, 3, 2, 1, 0],
 ];
 
-const sidebarItems: SidebarItem[] = [
+const sidebarItems = [
   { id: "dashboard", label: "Dashboard" },
   { id: "commits", label: "Commits" },
   { id: "analytics", label: "Analytics" },
@@ -250,7 +228,7 @@ const sidebarItems: SidebarItem[] = [
   { id: "logout", label: "Logout" },
 ];
 
-function HomeFeatureIcon({ icon }: { icon: HomeIconKey }) {
+function HomeFeatureIcon({ icon }: { icon: string }) {
   if (icon === "signal") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden>
@@ -361,7 +339,7 @@ function HomePage({ onConnect }: { onConnect: () => void }) {
         <section className="hero-section">
           <div className="hero-copy">
             <p className="eyebrow">Enterprise Engineering Intelligence Platform</p>
-            <h1>Give leadership and invidual one trusted system for delivery clarity.</h1>
+            <h1>Give leadership and individual one trusted system for delivery clarity.</h1>
             <p>
               CodePulse brings commits, pull requests, review behavior, and governance
               into a unified intelligence layer so organizations ship with higher
@@ -381,6 +359,7 @@ function HomePage({ onConnect }: { onConnect: () => void }) {
                 Explore product tour
               </a>
             </div>
+             
 
             <div className="hero-signal-grid">
               {heroSignals.map((signal) => (
@@ -583,80 +562,32 @@ function HomePage({ onConnect }: { onConnect: () => void }) {
           </div>
         </section>
 
-        <section className="results-section" id="results">
-          <div className="impact-grid">
-            {impactStats.map((item) => (
-              <article key={item.label} className="impact-card">
-                <p>{item.label}</p>
-                <strong>{item.value}</strong>
-              </article>
-            ))}
-          </div>
+<section className="results-section" id="results">
+  <div className="impact-grid">
+    {impactStats.map((item) => (
+      <article key={item.label}>
+        <strong>{item.value}</strong>
+        <p>{item.label}</p>
+      </article>
+    ))}
+  </div>
+</section>
 
-          <article className="testimonial-card">
-            <p className="panel-label">Customer voice</p>
-            <h3>
-              "We stopped reacting at sprint-end. CodePulse gives us early signals and
-              we ship with confidence."
-            </h3>
-            <span>VP Engineering, Global SaaS Team</span>
-          </article>
-        </section>
-
-        <section className="faq-section" id="faq">
-          <div className="section-title">
-            <h2>Frequently asked questions from product and engineering organizations</h2>
-          </div>
-          <div className="faq-list">
-            {faqItems.map((item) => (
-              <article key={item.q}>
-                <h3>{item.q}</h3>
-                <p>{item.a}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="cta-section" id="cta">
-          <h2>Adopt a landing experience and platform story that reflects enterprise-grade execution.</h2>
-          <p>
-            Connect GitHub, align engineering metrics to business outcomes, and give every
-            stakeholder a reliable view of delivery performance.
-          </p>
-          <div className="hero-actions">
-            <button className="btn btn-primary btn-elevated" onClick={onConnect}>
-              <Github size={16} />
-              Launch CodePulse
-            </button>
-            <a className="btn btn-ghost" href="#platform">
-              Explore platform
-            </a>
-          </div>
-        </section>
-      </main>
-
-      <footer className="landing-footer">
-        <p>(c) 2026 CodePulse. Precision visibility for high-performing engineering teams.</p>
-        <div className="footer-links">
-          <a href="#home">Home</a>
-          <a href="#platform">Platform</a>
-          <a href="#solutions">Solutions</a>
-          <a href="#security">Security</a>
-          <a href="#faq">Resources</a>
-        </div>
-      </footer>
-    </div>
-  );
+</main>
+</div>
+);
 }
 
 function AuthPage({
   onBackHome,
   onAuthSuccess,
+  onGitHubLogin,
 }: {
   onBackHome: () => void;
   onAuthSuccess: () => void;
+  onGitHubLogin: () => void;
 }) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState("login");
 
   return (
     <div className="auth-page">
@@ -748,7 +679,7 @@ function AuthPage({
                 </label>
               )}
 
-              <button type="submit" className="btn btn-primary btn-elevated auth-submit">
+              <button type="button" className="btn btn-primary btn-elevated auth-submit" onClick={onGitHubLogin}>
                 <Github size={16} />
                 {mode === "login" ? "Log in with GitHub" : "Sign up with GitHub"}
               </button>
@@ -766,9 +697,31 @@ function AuthPage({
 
 function DashboardPage({
   onOpenRepositories,
+  accessToken,
 }: {
   onOpenRepositories: () => void;
+  accessToken: string | null;
 }) {
+  const [repos, setRepos] = useState<any[]>([]);
+  const [signals, setSignals] = useState(dashboardSignals);
+
+  useEffect(() => {
+    if (accessToken) {
+      fetch('https://api.github.com/user/repos', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+      .then(r => r.json())
+      .then(data => {
+        setRepos(data);
+        const updatedSignals = dashboardSignals.map(signal => 
+          signal.label === "Risk alerts" ? { ...signal, value: data.length.toString(), label: "Active repos" } : signal
+        );
+        setSignals(updatedSignals);
+      })
+      .catch(err => console.error('Failed to fetch repos:', err));
+    }
+  }, [accessToken]);
+
   const maxWeeklyCommits = Math.max(...weeklyCommits.map((entry) => entry.commits));
   const totalCommits = weeklyCommits.reduce((sum, entry) => sum + entry.commits, 0);
 
@@ -808,7 +761,7 @@ function DashboardPage({
       </section>
 
       <section className="signal-grid">
-        {dashboardSignals.map((signal) => (
+        {signals.map((signal) => (
           <article key={signal.label} className="signal-card">
             <p>{signal.label}</p>
             <strong>{signal.value}</strong>
@@ -939,7 +892,20 @@ function DashboardPage({
   );
 }
 
-function RepositoriesPage() {
+function RepositoriesPage({ accessToken }: { accessToken: string | null }) {
+  const [repos, setRepos] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (accessToken) {
+      fetch('https://api.github.com/user/repos', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+      .then(r => r.json())
+      .then(data => setRepos(data))
+      .catch(err => console.error('Failed to fetch repos:', err));
+    }
+  }, [accessToken]);
+
   return (
     <div className="repo-page">
       <div className="dashboard-heading">
@@ -950,7 +916,7 @@ function RepositoriesPage() {
       <section className="repo-summary-grid">
         <article>
           <p>Active repositories</p>
-          <strong>24</strong>
+          <strong>{repos.length}</strong>
         </article>
         <article>
           <p>Avg merge cycle</p>
@@ -972,11 +938,11 @@ function RepositoriesPage() {
             </tr>
           </thead>
           <tbody>
-            {repositories.map((repo) => (
-              <tr key={repo.name}>
+            {repos.map((repo) => (
+              <tr key={repo.id}>
                 <td>{repo.name}</td>
-                <td>{repo.commits}</td>
-                <td>{repo.language}</td>
+                <td>{repo.commits || 'N/A'}</td>
+                <td>{repo.language || 'N/A'}</td>
               </tr>
             ))}
           </tbody>
@@ -989,9 +955,11 @@ function RepositoriesPage() {
 function AppShell({
   view,
   setView,
+  accessToken,
 }: {
-  view: AppView;
-  setView: (view: AppView) => void;
+  view: string;
+  setView: (view: string) => void;
+  accessToken: string | null;
 }) {
   return (
     <div className="app-shell">
@@ -1052,9 +1020,9 @@ function AppShell({
 
       <main className="dashboard-main">
         {view === "dashboard" ? (
-          <DashboardPage onOpenRepositories={() => setView("repositories")} />
+          <DashboardPage onOpenRepositories={() => setView("repositories")} accessToken={accessToken} />
         ) : (
-          <RepositoriesPage />
+          <RepositoriesPage accessToken={accessToken} />
         )}
       </main>
     </div>
@@ -1062,17 +1030,33 @@ function AppShell({
 }
 
 export default function App() {
-  const [view, setView] = useState<AppView>("home");
+  const [view, setView] = useState("home");
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code && !accessToken) {
+      fetch(`/api/github-oauth?code=${code}`)
+        .then(r => r.json())
+        .then(data => {
+          setAccessToken(data.access_token);
+          setView('dashboard');
+          // optionally clean up URL
+        });
+    }
+  }, [accessToken]);
 
   if (view === "home") {
     return <HomePage onConnect={() => setView("auth")} />;
   }
 
   if (view === "auth") {
-    return <AuthPage onBackHome={() => setView("home")} onAuthSuccess={() => setView("dashboard")} />;
+    return <AuthPage onBackHome={() => setView("home")} onAuthSuccess={() => setView("dashboard")} onGitHubLogin={goToGithub} />;
   }
 
-  return <AppShell view={view} setView={setView} />;
+  return <AppShell view={view} setView={setView} accessToken={accessToken} />;
 }
+
 
 
