@@ -9,10 +9,14 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  MessageSquare,
+  FileText,
 } from "lucide-react";
 import SettingsPage from "./components/SettingsPage";
 import SnippetsPage from "./components/SnippetsPage";
 import AnalyticsPageComponent from "./components/AnalyticsPage";
+import ChatsPage from "./components/ChatsPage";
+import TemplatesPage from "./components/TemplatesPage";
 // at top of file
 const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
@@ -228,6 +232,8 @@ const sidebarItems = [
   { id: "commits", label: "Commits" },
   { id: "analytics", label: "Analytics" },
   { id: "repositories", label: "Repositories" },
+  { id: "chats", label: "Chats" },
+  { id: "templates", label: "Templates" },
   { id: "snippets", label: "Snippets" },
   { id: "settings", label: "Settings" },
   { id: "logout", label: "Logout" },
@@ -979,6 +985,10 @@ function AppShell({
         return <SnippetsPage />;
       case 'analytics':
         return <AnalyticsPageComponent />;
+      case 'chats':
+        return <ChatsPage />;
+      case 'templates':
+        return <TemplatesPage />;
       default:
         return <DashboardPage onOpenRepositories={() => setView("repositories")} accessToken={accessToken} />;
     }
@@ -1020,6 +1030,8 @@ function AppShell({
                 {item.id === "commits" && <GitCommitHorizontal size={16} />}
                 {item.id === "analytics" && <ChartNoAxesCombined size={16} />}
                 {item.id === "repositories" && <FolderGit2 size={16} />}
+                {item.id === "chats" && <MessageSquare size={16} />}
+                {item.id === "templates" && <FileText size={16} />}
                 {item.id === "snippets" && <Code size={16} />}
                 {item.id === "settings" && <Settings size={16} />}
                 {item.id === "logout" && <LogOut size={16} />}
