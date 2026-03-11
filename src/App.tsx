@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   ChartNoAxesCombined,
+  Code,
   FolderGit2,
   GitCommitHorizontal,
   Github,
@@ -9,6 +10,9 @@ import {
   LogOut,
   Settings,
 } from "lucide-react";
+import SettingsPage from "./components/SettingsPage";
+import SnippetsPage from "./components/SnippetsPage";
+import AnalyticsPageComponent from "./components/AnalyticsPage";
 // at top of file
 const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
@@ -224,6 +228,7 @@ const sidebarItems = [
   { id: "commits", label: "Commits" },
   { id: "analytics", label: "Analytics" },
   { id: "repositories", label: "Repositories" },
+  { id: "snippets", label: "Snippets" },
   { id: "settings", label: "Settings" },
   { id: "logout", label: "Logout" },
 ];
@@ -961,6 +966,24 @@ function AppShell({
   setView: (view: string) => void;
   accessToken: string | null;
 }) {
+  const renderMainContent = () => {
+    switch (view) {
+      case 'dashboard':
+      case 'commits':
+        return <DashboardPage onOpenRepositories={() => setView("repositories")} accessToken={accessToken} />;
+      case 'repositories':
+        return <RepositoriesPage accessToken={accessToken} />;
+      case 'settings':
+        return <SettingsPage />;
+      case 'snippets':
+        return <SnippetsPage />;
+      case 'analytics':
+        return <AnalyticsPageComponent />;
+      default:
+        return <DashboardPage onOpenRepositories={() => setView("repositories")} accessToken={accessToken} />;
+    }
+  };
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -978,32 +1001,26 @@ function AppShell({
 
         <nav>
           {sidebarItems.map((item) => {
-            const isActive =
-              (view === "dashboard" && ["dashboard", "commits", "analytics"].includes(item.id)) ||
-              (view === "repositories" && item.id === "repositories");
+            const isActive = view === item.id || 
+              (view === "commits" && item.id === "dashboard");
 
             return (
               <button
                 key={item.id}
                 className={`side-link ${isActive ? "active" : ""}`}
                 onClick={() => {
-                  if (item.id === "repositories") {
-                    setView("repositories");
-                    return;
-                  }
                   if (item.id === "logout") {
                     setView("home");
                     return;
                   }
-                  if (["dashboard", "commits", "analytics"].includes(item.id)) {
-                    setView("dashboard");
-                  }
+                  setView(item.id);
                 }}
               >
                 {item.id === "dashboard" && <LayoutDashboard size={16} />}
                 {item.id === "commits" && <GitCommitHorizontal size={16} />}
                 {item.id === "analytics" && <ChartNoAxesCombined size={16} />}
                 {item.id === "repositories" && <FolderGit2 size={16} />}
+                {item.id === "snippets" && <Code size={16} />}
                 {item.id === "settings" && <Settings size={16} />}
                 {item.id === "logout" && <LogOut size={16} />}
                 <span>{item.label}</span>
@@ -1019,11 +1036,7 @@ function AppShell({
       </aside>
 
       <main className="dashboard-main">
-        {view === "dashboard" ? (
-          <DashboardPage onOpenRepositories={() => setView("repositories")} accessToken={accessToken} />
-        ) : (
-          <RepositoriesPage accessToken={accessToken} />
-        )}
+        {renderMainContent()}
       </main>
     </div>
   );
