@@ -21,6 +21,7 @@ export default defineConfig(({mode}) => {
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
         '/api': 'http://localhost:4001',
+        '/uploads': 'http://localhost:4001',
       },
     },
   };

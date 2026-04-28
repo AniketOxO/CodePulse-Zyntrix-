@@ -1,11 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  BrowserRouter,
+  Link,
+  NavLink,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import {
   ArrowRight,
   ChartNoAxesCombined,
   Code,
   FolderGit2,
-  GitCommitHorizontal,
   Github,
+  Home,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -17,10 +28,18 @@ import SnippetsPage from "./components/SnippetsPage";
 import AnalyticsPageComponent from "./components/AnalyticsPage";
 import ChatsPage from "./components/ChatsPage";
 import TemplatesPage from "./components/TemplatesPage";
+import LoginPage from "./components/LoginPage";
+import SignupPage from "./components/SignupPage";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { authApi } from "./services/api";
 // at top of file
 const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
 function goToGithub() {
+  if (!CLIENT_ID) {
+    console.error("Missing VITE_GITHUB_CLIENT_ID for GitHub OAuth");
+    return;
+  }
   const redirect = encodeURIComponent(window.location.origin);
   window.location.href =
     `https://github.com/login/oauth/authorize` +
@@ -228,15 +247,14 @@ const contributionMatrix = [
 ];
 
 const sidebarItems = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "commits", label: "Commits" },
-  { id: "analytics", label: "Analytics" },
-  { id: "repositories", label: "Repositories" },
-  { id: "chats", label: "Chats" },
-  { id: "templates", label: "Templates" },
-  { id: "snippets", label: "Snippets" },
-  { id: "settings", label: "Settings" },
-  { id: "logout", label: "Logout" },
+  { id: "home", label: "Home", path: "/", icon: Home },
+  { id: "dashboard", label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+  { id: "analytics", label: "Analytics", path: "/analytics", icon: ChartNoAxesCombined },
+  { id: "repositories", label: "Repositories", path: "/repositories", icon: FolderGit2 },
+  { id: "chats", label: "Chats", path: "/chats", icon: MessageSquare },
+  { id: "templates", label: "Templates", path: "/templates", icon: FileText },
+  { id: "snippets", label: "Snippets", path: "/snippets", icon: Code },
+  { id: "settings", label: "Settings", path: "/settings", icon: Settings },
 ];
 
 function HomeFeatureIcon({ icon }: { icon: string }) {
@@ -314,7 +332,24 @@ function BrandMark() {
   );
 }
 
-function HomePage({ onConnect }: { onConnect: () => void }) {
+function HomePage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const onConnect = () => navigate("/dashboard");
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "CP";
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
   return (
     <div className="home-page">
       <span className="ambient-shape ambient-a" aria-hidden />
@@ -336,13 +371,41 @@ function HomePage({ onConnect }: { onConnect: () => void }) {
         </nav>
 
         <div className="nav-actions">
-          <a className="btn btn-ghost" href="#cta">
-            Book demo
-          </a>
-          <button className="btn btn-primary btn-elevated" onClick={onConnect}>
-            <Github size={16} />
-            Connect GitHub
-          </button>
+          {user ? (
+            <div className="nav-user">
+              <button
+                type="button"
+                className="avatar nav-avatar"
+                onClick={() => navigate("/dashboard")}
+                aria-label="Go to dashboard"
+              >
+                {user.profilePicUrl ? (
+                  <img src={user.profilePicUrl} alt={user.name} />
+                ) : (
+                  <span>{initials}</span>
+                )}
+              </button>
+              <div className="nav-user-meta">
+                <p>{user.name}</p>
+                <span>{user.email}</span>
+              </div>
+              <button className="btn btn-ghost" onClick={onConnect}>
+                Dashboard
+              </button>
+              <button className="btn btn-ghost" onClick={handleLogout}>
+                Log out
+              </button>
+            </div>
+          ) : (
+            <>
+              <Link className="btn btn-ghost" to="/login">
+                Log in
+              </Link>
+              <Link className="btn btn-primary btn-elevated" to="/signup">
+                Sign up
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -362,13 +425,16 @@ function HomePage({ onConnect }: { onConnect: () => void }) {
               <li>Fast setup with secure GitHub integration and role-based controls</li>
             </ul>
             <div className="hero-actions">
-              <button className="btn btn-primary btn-elevated" onClick={onConnect}>
-                <Github size={16} />
-                Start free integration
+              <button
+                className="btn btn-primary btn-elevated"
+                onClick={() => navigate("/signup")}
+              >
+                Create free account
               </button>
-              <a className="btn btn-ghost" href="#preview">
-                Explore product tour
-              </a>
+              <button className="btn btn-ghost" onClick={goToGithub}>
+                <Github size={16} />
+                Connect GitHub
+              </button>
             </div>
              
 
@@ -589,137 +655,15 @@ function HomePage({ onConnect }: { onConnect: () => void }) {
 );
 }
 
-function AuthPage({
-  onBackHome,
-  onAuthSuccess,
-  onGitHubLogin,
-}: {
-  onBackHome: () => void;
-  onAuthSuccess: () => void;
-  onGitHubLogin: () => void;
-}) {
-  const [mode, setMode] = useState("login");
-
-  return (
-    <div className="auth-page">
-      <span className="ambient-shape ambient-a" aria-hidden />
-      <span className="ambient-shape ambient-b" aria-hidden />
-
-      <section className="auth-shell">
-        <header className="auth-header">
-          <button className="btn btn-ghost" onClick={onBackHome}>
-            Back to home
-          </button>
-          <a
-            className="logo-wrap"
-            href="#home"
-            onClick={(event) => {
-              event.preventDefault();
-              onBackHome();
-            }}
-          >
-            <div className="logo-badge">
-              <BrandMark />
-            </div>
-            <span>CodePulse</span>
-          </a>
-        </header>
-
-        <article className="auth-card">
-          <div className="auth-intro">
-            <p className="eyebrow">GitHub access</p>
-            <h1>Log in or sign up to connect your repositories.</h1>
-            <p>
-              Authenticate your team with GitHub, then open your dashboard to start
-              tracking commits, pull requests, and delivery health.
-            </p>
-
-            <ul className="auth-benefits">
-              <li>Scoped GitHub OAuth permissions</li>
-              <li>Secure organization-level access control</li>
-              <li>Instant setup for team dashboards</li>
-            </ul>
-          </div>
-
-          <div className="auth-form-wrap">
-            <div className="auth-switch" role="tablist" aria-label="Authentication mode">
-              <button
-                type="button"
-                className={mode === "login" ? "active" : ""}
-                onClick={() => setMode("login")}
-              >
-                Log in
-              </button>
-              <button
-                type="button"
-                className={mode === "signup" ? "active" : ""}
-                onClick={() => setMode("signup")}
-              >
-                Sign up
-              </button>
-            </div>
-
-            <form
-              className="auth-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                onAuthSuccess();
-              }}
-            >
-              {mode === "signup" && (
-                <label>
-                  Full name
-                  <input type="text" placeholder="Alex Carter" required />
-                </label>
-              )}
-
-              <label>
-                Work email
-                <input type="email" placeholder="name@company.com" required />
-              </label>
-
-              <label>
-                Password
-                <input type="password" placeholder="Enter password" required />
-              </label>
-
-              {mode === "signup" && (
-                <label>
-                  Organization
-                  <input type="text" placeholder="Velocity Labs" required />
-                </label>
-              )}
-
-              <button type="button" className="btn btn-primary btn-elevated auth-submit" onClick={onGitHubLogin}>
-                <Github size={16} />
-                {mode === "login" ? "Log in with GitHub" : "Sign up with GitHub"}
-              </button>
-            </form>
-
-            <button className="btn btn-ghost auth-continue" onClick={onAuthSuccess}>
-              Continue to dashboard
-            </button>
-          </div>
-        </article>
-      </section>
-    </div>
-  );
-}
-
-function DashboardPage({
-  onOpenRepositories,
-  accessToken,
-}: {
-  onOpenRepositories: () => void;
-  accessToken: string | null;
-}) {
+function DashboardPage({ githubToken }: { githubToken: string | null }) {
   const [repos, setRepos] = useState<any[]>([]);
   const [signals, setSignals] = useState(dashboardSignals);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (accessToken) {
+    if (githubToken) {
       fetch('https://api.github.com/user/repos', {
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: { Authorization: `Bearer ${githubToken}` }
       })
       .then(r => r.json())
       .then(data => {
@@ -731,7 +675,7 @@ function DashboardPage({
       })
       .catch(err => console.error('Failed to fetch repos:', err));
     }
-  }, [accessToken]);
+  }, [githubToken]);
 
   const maxWeeklyCommits = Math.max(...weeklyCommits.map((entry) => entry.commits));
   const totalCommits = weeklyCommits.reduce((sum, entry) => sum + entry.commits, 0);
@@ -749,6 +693,18 @@ function DashboardPage({
 
   return (
     <div className="dashboard-page">
+      {!githubToken && (
+        <div className="panel banner-card">
+          <div>
+            <h3>Connect GitHub to unlock live signals</h3>
+            <p>Sync repositories to refresh dashboard insights automatically.</p>
+          </div>
+          <button className="btn btn-primary" onClick={goToGithub}>
+            <Github size={16} />
+            Connect GitHub
+          </button>
+        </div>
+      )}
       <section className="dashboard-hero">
         <div>
           <p className="panel-label">Execution cockpit</p>
@@ -764,7 +720,10 @@ function DashboardPage({
           </div>
         </div>
         <div className="dashboard-hero-actions">
-          <button className="btn btn-primary btn-elevated" onClick={onOpenRepositories}>
+          <button
+            className="btn btn-primary btn-elevated"
+            onClick={() => navigate("/repositories")}
+          >
             Open repositories <ArrowRight size={15} />
           </button>
           <button className="btn btn-ghost">Export weekly report</button>
@@ -903,22 +862,34 @@ function DashboardPage({
   );
 }
 
-function RepositoriesPage({ accessToken }: { accessToken: string | null }) {
+function RepositoriesPage({ githubToken }: { githubToken: string | null }) {
   const [repos, setRepos] = useState<any[]>([]);
 
   useEffect(() => {
-    if (accessToken) {
+    if (githubToken) {
       fetch('https://api.github.com/user/repos', {
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: { Authorization: `Bearer ${githubToken}` }
       })
       .then(r => r.json())
       .then(data => setRepos(data))
       .catch(err => console.error('Failed to fetch repos:', err));
     }
-  }, [accessToken]);
+  }, [githubToken]);
 
   return (
     <div className="repo-page">
+      {!githubToken && (
+        <div className="panel banner-card">
+          <div>
+            <h3>Connect GitHub to view repositories</h3>
+            <p>Link your GitHub account to pull live repository data.</p>
+          </div>
+          <button className="btn btn-primary" onClick={goToGithub}>
+            <Github size={16} />
+            Connect GitHub
+          </button>
+        </div>
+      )}
       <div className="dashboard-heading">
         <h1>Repositories</h1>
         <p>Project-level delivery pulse across active codebases.</p>
@@ -963,124 +934,244 @@ function RepositoriesPage({ accessToken }: { accessToken: string | null }) {
   );
 }
 
+const GITHUB_TOKEN_KEY = "codepulse_github_token";
+
+function ProtectedRoute() {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="page-loader">
+        <div className="loader-card">
+          <p className="eyebrow">Securing your session</p>
+          <h2>Loading your workspace</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  return <Outlet />;
+}
+
 function AppShell({
-  view,
-  setView,
-  accessToken,
+  githubToken,
+  onLogoutGithub,
 }: {
-  view: string;
-  setView: (view: string) => void;
-  accessToken: string | null;
+  githubToken: string | null;
+  onLogoutGithub: () => void;
 }) {
-  const renderMainContent = () => {
-    switch (view) {
-      case 'dashboard':
-      case 'commits':
-        return <DashboardPage onOpenRepositories={() => setView("repositories")} accessToken={accessToken} />;
-      case 'repositories':
-        return <RepositoriesPage accessToken={accessToken} />;
-      case 'settings':
-        return <SettingsPage />;
-      case 'snippets':
-        return <SnippetsPage />;
-      case 'analytics':
-        return <AnalyticsPageComponent />;
-      case 'chats':
-        return <ChatsPage />;
-      case 'templates':
-        return <TemplatesPage />;
-      default:
-        return <DashboardPage onOpenRepositories={() => setView("repositories")} accessToken={accessToken} />;
+  const { user, logout, updateUser } = useAuth();
+  const navigate = useNavigate();
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "CP";
+
+  const handleLogout = () => {
+    logout();
+    onLogoutGithub();
+    navigate("/");
+  };
+
+  const handleAvatarPick = () => {
+    if (!isUploadingAvatar) {
+      avatarInputRef.current?.click();
+    }
+  };
+
+  const handleAvatarChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setAvatarError(null);
+    setIsUploadingAvatar(true);
+    try {
+      const result = await authApi.updateProfilePic(file);
+      updateUser(result.user);
+    } catch (error) {
+      setAvatarError(
+        error instanceof Error ? error.message : "Failed to update profile image"
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
     }
   };
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand">
+        <Link className="sidebar-brand" to="/dashboard">
           <div className="logo-badge">
             <BrandMark />
           </div>
           <span>CodePulse</span>
-        </div>
+        </Link>
 
-        <div className="sidebar-workspace">
-          <p>Workspace</p>
-          <strong>Velocity Labs</strong>
+        <div className="sidebar-user">
+          <button
+            type="button"
+            className="avatar avatar-button"
+            onClick={handleAvatarPick}
+            disabled={isUploadingAvatar}
+            aria-label="Change profile photo"
+          >
+            {user?.profilePicUrl ? (
+              <img src={user.profilePicUrl} alt={user.name} />
+            ) : (
+              <span>{initials}</span>
+            )}
+            <span className="avatar-edit">Change</span>
+          </button>
+          <input
+            ref={avatarInputRef}
+            className="avatar-input"
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarChange}
+          />
+          <div>
+            <p>{user?.name || "Workspace"}</p>
+            <span>{user?.email || ""}</span>
+            {avatarError && <span className="avatar-error">{avatarError}</span>}
+            {isUploadingAvatar && !avatarError && (
+              <span className="avatar-status">Updating photo...</span>
+            )}
+          </div>
         </div>
 
         <nav>
-          {sidebarItems.map((item) => {
-            const isActive = view === item.id || 
-              (view === "commits" && item.id === "dashboard");
-
-            return (
-              <button
-                key={item.id}
-                className={`side-link ${isActive ? "active" : ""}`}
-                onClick={() => {
-                  if (item.id === "logout") {
-                    setView("home");
-                    return;
-                  }
-                  setView(item.id);
-                }}
-              >
-                {item.id === "dashboard" && <LayoutDashboard size={16} />}
-                {item.id === "commits" && <GitCommitHorizontal size={16} />}
-                {item.id === "analytics" && <ChartNoAxesCombined size={16} />}
-                {item.id === "repositories" && <FolderGit2 size={16} />}
-                {item.id === "chats" && <MessageSquare size={16} />}
-                {item.id === "templates" && <FileText size={16} />}
-                {item.id === "snippets" && <Code size={16} />}
-                {item.id === "settings" && <Settings size={16} />}
-                {item.id === "logout" && <LogOut size={16} />}
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+          {sidebarItems.map((item) => (
+            <NavLink
+              key={item.id}
+              to={item.path}
+              end={item.path === "/dashboard"}
+              className={({ isActive }) =>
+                `side-link ${isActive ? "active" : ""}`
+              }
+            >
+              <item.icon size={16} />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         <div className="sidebar-note">
-          <p>GitHub connected</p>
-          <strong>Sync: 2 min ago</strong>
+          <p>{githubToken ? "GitHub connected" : "GitHub not connected"}</p>
+          <strong>{githubToken ? "Sync enabled" : "Connect to enable sync"}</strong>
         </div>
+
+        {!githubToken && (
+          <button className="btn btn-ghost sidebar-connect" onClick={goToGithub}>
+            <Github size={16} />
+            Connect GitHub
+          </button>
+        )}
+
+        <button className="side-link side-logout" onClick={handleLogout}>
+          <LogOut size={16} />
+          <span>Logout</span>
+        </button>
       </aside>
 
       <main className="dashboard-main">
-        {renderMainContent()}
+        <Outlet />
       </main>
     </div>
   );
 }
 
-export default function App() {
-  const [view, setView] = useState("home");
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+function AppRoutes() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [githubToken, setGithubToken] = useState<string | null>(() =>
+    localStorage.getItem(GITHUB_TOKEN_KEY)
+  );
+  const [handledCode, setHandledCode] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const code = params.get("code");
-    if (code && !accessToken) {
-      fetch(`/api/github-oauth?code=${code}`)
-        .then(r => r.json())
-        .then(data => {
-          setAccessToken(data.access_token);
-          setView('dashboard');
-          // optionally clean up URL
-        });
+    if (!code || code === handledCode) {
+      return;
     }
-  }, [accessToken]);
 
-  if (view === "home") {
-    return <HomePage onConnect={() => setView("auth")} />;
-  }
+    setHandledCode(code);
 
-  if (view === "auth") {
-    return <AuthPage onBackHome={() => setView("home")} onAuthSuccess={() => setView("dashboard")} onGitHubLogin={goToGithub} />;
-  }
+    const exchangeToken = async () => {
+      try {
+        const response = await fetch(`/api/github-oauth?code=${code}`);
+        const data = await response.json();
+        if (data.access_token) {
+          localStorage.setItem(GITHUB_TOKEN_KEY, data.access_token);
+          setGithubToken(data.access_token);
+        }
+      } catch (error) {
+        console.error('GitHub OAuth failed:', error);
+      } finally {
+        navigate(user ? "/dashboard" : "/login", { replace: true });
+      }
+    };
 
-  return <AppShell view={view} setView={setView} accessToken={accessToken} />;
+    exchangeToken();
+  }, [handledCode, location.search, navigate, user]);
+
+  const clearGithubToken = () => {
+    localStorage.removeItem(GITHUB_TOKEN_KEY);
+    setGithubToken(null);
+  };
+
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/login" element={<LoginPage onGithubLogin={goToGithub} />} />
+      <Route path="/signup" element={<SignupPage onGithubLogin={goToGithub} />} />
+
+      <Route element={<ProtectedRoute />}>
+        <Route
+          element={<AppShell githubToken={githubToken} onLogoutGithub={clearGithubToken} />}
+        >
+          <Route path="/dashboard" element={<DashboardPage githubToken={githubToken} />} />
+          <Route path="/analytics" element={<AnalyticsPageComponent />} />
+          <Route path="/repositories" element={<RepositoriesPage githubToken={githubToken} />} />
+          <Route path="/chats" element={<ChatsPage />} />
+          <Route path="/templates" element={<TemplatesPage />} />
+          <Route path="/snippets" element={<SnippetsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
 
 

@@ -4,6 +4,11 @@
  */
 
 const API_BASE = '/api';
+const TOKEN_KEY = 'codepulse_token';
+
+function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
 
 // ============================================
 // TYPES
@@ -79,11 +84,21 @@ async function request<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
+  const isFormData = options?.body instanceof FormData;
+  const headers = new Headers(options?.headers || {});
+
+  if (!isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const token = getAuthToken();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
     ...options,
+    headers,
   });
 
   if (!response.ok) {
@@ -97,6 +112,54 @@ async function request<T>(
 
   return response.json();
 }
+
+// ============================================
+// AUTH API
+// ============================================
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  profilePicUrl?: string | null;
+  provider: 'local' | 'google';
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+
+export const authApi = {
+  register: (data: FormData) =>
+    request<AuthResponse>('/auth/register', {
+      method: 'POST',
+      body: data,
+    }),
+
+  login: (data: { email: string; password: string }) =>
+    request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  googleLogin: (credential: string) =>
+    request<AuthResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ credential }),
+    }),
+
+  updateProfilePic: (file: File) => {
+    const formData = new FormData();
+    formData.append('profilePic', file);
+    return request<{ user: AuthUser }>('/auth/profile-pic', {
+      method: 'PUT',
+      body: formData,
+    });
+  },
+
+  me: () => request<AuthUser>('/auth/me'),
+};
 
 // ============================================
 // CHAT SESSIONS API

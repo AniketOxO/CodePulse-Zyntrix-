@@ -1,12 +1,309 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+import { OAuth2Client } from 'google-auth-library';
+import { connectDatabase } from './database.js';
+import User from './models/User.js';
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const jwtSecret = process.env.JWT_SECRET;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const id = crypto.randomBytes(12).toString('hex');
+      cb(null, `${id}${ext}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowed = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+    if (!allowed.has(ext)) {
+      return cb(new Error('Only image uploads are allowed'));
+    }
+    return cb(null, true);
+  },
+  limits: { fileSize: 2 * 1024 * 1024 },
+});
+
+// ============================================
+// AUTH HELPERS
+// ============================================
+
+function createToken(user) {
+  if (!jwtSecret) {
+    throw new Error('Missing JWT_SECRET in environment');
+  }
+  return jwt.sign({ sub: user._id.toString() }, jwtSecret, { expiresIn: '7d' });
+}
+
+function serializeUser(user) {
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    profilePicUrl: user.profilePicUrl || null,
+    provider: user.provider,
+  };
+}
+
+function requireAuth(req, res, next) {
+  if (!jwtSecret) {
+    return res.status(500).json({ error: 'Missing JWT_SECRET in environment' });
+  }
+  const header = req.headers.authorization || '';
+  const [, token] = header.split(' ');
+  if (!token) {
+    return res.status(401).json({ error: 'Missing auth token' });
+  }
+  try {
+    const payload = jwt.verify(token, jwtSecret);
+    req.userId = payload.sub;
+    return next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// ============================================
+// AUTH ROUTES
+// ============================================
+
+app.post('/api/auth/register', upload.single('profilePic'), async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) {
+      return res.status(409).json({ error: 'Email already in use' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const profilePicUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      passwordHash,
+      profilePicUrl,
+      provider: 'local',
+      lastLoginAt: new Date(),
+    });
+
+    const token = createToken(user);
+    return res.status(201).json({ token, user: serializeUser(user) });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to register user' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user || !user.passwordHash) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const token = createToken(user);
+    return res.json({ token, user: serializeUser(user) });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to log in' });
+  }
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ error: 'Missing GOOGLE_CLIENT_ID in environment' });
+    }
+
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ error: 'Missing Google credential' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email || !payload.sub) {
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
+
+    const normalizedEmail = payload.email.toLowerCase();
+    let user = await User.findOne({
+      $or: [{ googleSub: payload.sub }, { email: normalizedEmail }],
+    });
+
+    if (!user) {
+      user = await User.create({
+        name: payload.name || 'Google User',
+        email: normalizedEmail,
+        provider: 'google',
+        googleSub: payload.sub,
+        profilePicUrl: payload.picture || null,
+        lastLoginAt: new Date(),
+      });
+    } else {
+      let updated = false;
+      if (!user.googleSub) {
+        user.googleSub = payload.sub;
+        updated = true;
+      }
+      if (!user.profilePicUrl && payload.picture) {
+        user.profilePicUrl = payload.picture;
+        updated = true;
+      }
+      if (user.provider !== 'google') {
+        user.provider = 'google';
+        updated = true;
+      }
+      if (updated) {
+        await user.save();
+      }
+    }
+
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const token = createToken(user);
+    return res.json({ token, user: serializeUser(user) });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to authenticate with Google' });
+  }
+});
+
+app.put('/api/auth/profile-pic', requireAuth, upload.single('profilePic'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Profile image is required' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const previousPic = user.profilePicUrl;
+    user.profilePicUrl = `/uploads/${req.file.filename}`;
+    await user.save();
+
+    if (previousPic && previousPic.startsWith('/uploads/')) {
+      const previousPath = path.join(uploadsDir, path.basename(previousPic));
+      fs.promises.unlink(previousPath).catch(() => {});
+    }
+
+    return res.json({ user: serializeUser(user) });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to update profile image' });
+  }
+});
+
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    return res.json(serializeUser(user));
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+app.get('/api/github-oauth', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) {
+      return res.status(400).json({ error: 'Missing GitHub OAuth code' });
+    }
+
+    if (typeof fetch !== 'function') {
+      return res.status(500).json({ error: 'Server fetch is unavailable. Use Node 18+.' });
+    }
+
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      return res.status(500).json({ error: 'Missing GitHub OAuth environment variables' });
+    }
+
+    const redirectUri = process.env.APP_URL || req.headers.origin || '';
+    const body = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code: String(code),
+    });
+    if (redirectUri) {
+      body.set('redirect_uri', redirectUri);
+    }
+
+    const response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      const message = data.error_description || data.error || 'GitHub OAuth failed';
+      return res.status(400).json({ error: message });
+    }
+
+    return res.json({
+      access_token: data.access_token,
+      token_type: data.token_type,
+      scope: data.scope,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to exchange GitHub OAuth code' });
+  }
+});
 
 // ============================================
 // IN-MEMORY DATA STORES (Replace with DB in production)
@@ -36,6 +333,12 @@ let analytics = {
   lastSyncTime: null,
   requestHistory: [],
 };
+
+app.use('/api/chats', requireAuth);
+app.use('/api/snippets', requireAuth);
+app.use('/api/templates', requireAuth);
+app.use('/api/settings', requireAuth);
+app.use('/api/analytics', requireAuth);
 
 // ============================================
 // CHAT SESSIONS CRUD
@@ -361,6 +664,14 @@ app.get('/api/github-oauth', async (req, res) => {
   }
 });
 
-app.listen(4001, () => {
-  console.log('Backend server running on port 4001');
-});
+const port = process.env.PORT || 4001;
+connectDatabase()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Backend server running on port ${port}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to connect to MongoDB:', error);
+    process.exit(1);
+  });
