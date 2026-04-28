@@ -193,6 +193,84 @@ const statsCards = [
   { label: "Sprint velocity", value: "82 pts" },
 ];
 
+const quickActions = [
+  {
+    id: "chat",
+    label: "Start a focus chat",
+    description: "Capture decisions and unblock quickly.",
+    path: "/chats",
+    icon: MessageSquare,
+  },
+  {
+    id: "snippet",
+    label: "Save a snippet",
+    description: "Store patterns you re-use weekly.",
+    path: "/snippets",
+    icon: Code,
+  },
+  {
+    id: "template",
+    label: "Draft a template",
+    description: "Standardize recurring prompts.",
+    path: "/templates",
+    icon: FileText,
+  },
+  {
+    id: "analytics",
+    label: "Review analytics",
+    description: "Spot delivery shifts in minutes.",
+    path: "/analytics",
+    icon: ChartNoAxesCombined,
+  },
+];
+
+type GoalItem = {
+  id: string;
+  title: string;
+  progress: number;
+};
+
+type CalendarConnections = {
+  google: boolean;
+  outlook: boolean;
+};
+
+type ChecklistItem = {
+  id: string;
+  label: string;
+  done: boolean;
+};
+
+const DEFAULT_CHECKLIST: ChecklistItem[] = [
+  { id: "plan", label: "Plan top 3 outcomes for today", done: false },
+  { id: "focus", label: "Run two 25-min focus sprints", done: false },
+  { id: "review", label: "Review open pull requests", done: false },
+];
+
+const DEFAULT_GOALS: GoalItem[] = [
+  { id: "release", title: "Ship weekly release", progress: 64 },
+  { id: "review", title: "Review cycle time under 6h", progress: 52 },
+  { id: "quality", title: "Reduce reopen rate", progress: 41 },
+];
+
+const DEFAULT_CALENDAR: CalendarConnections = {
+  google: false,
+  outlook: false,
+};
+
+const CHECKLIST_KEY = "codepulse_checklist";
+const GOALS_KEY = "codepulse_goals";
+const NOTES_KEY = "codepulse_notes";
+const CALENDAR_KEY = "codepulse_calendar";
+const FOCUS_DURATION = 25 * 60;
+const BREAK_DURATION = 5 * 60;
+
+const upcomingEvents = [
+  { id: "standup", time: "10:00", title: "Daily standup", tag: "Team" },
+  { id: "planning", time: "13:00", title: "Sprint planning", tag: "Planning" },
+  { id: "review", time: "16:30", title: "PR review block", tag: "Quality" },
+];
+
 const weeklyCommits = [
   { week: "W1", commits: 52 },
   { week: "W2", commits: 68 },
@@ -659,6 +737,59 @@ function DashboardPage({ githubToken }: { githubToken: string | null }) {
   const [repos, setRepos] = useState<any[]>([]);
   const [signals, setSignals] = useState(dashboardSignals);
   const navigate = useNavigate();
+  const [timerMode, setTimerMode] = useState<"focus" | "break">("focus");
+  const [secondsLeft, setSecondsLeft] = useState(FOCUS_DURATION);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [newTask, setNewTask] = useState("");
+  const [newGoal, setNewGoal] = useState("");
+  const [checklist, setChecklist] = useState<ChecklistItem[]>(() => {
+    const stored = localStorage.getItem(CHECKLIST_KEY);
+    if (!stored) {
+      return DEFAULT_CHECKLIST;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed as ChecklistItem[];
+      }
+    } catch (error) {
+      console.error("Failed to parse checklist:", error);
+    }
+    return DEFAULT_CHECKLIST;
+  });
+  const [goals, setGoals] = useState<GoalItem[]>(() => {
+    const stored = localStorage.getItem(GOALS_KEY);
+    if (!stored) {
+      return DEFAULT_GOALS;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed as GoalItem[];
+      }
+    } catch (error) {
+      console.error("Failed to parse goals:", error);
+    }
+    return DEFAULT_GOALS;
+  });
+  const [notes, setNotes] = useState(() => localStorage.getItem(NOTES_KEY) ?? "");
+  const [calendarConnections, setCalendarConnections] =
+    useState<CalendarConnections>(() => {
+      const stored = localStorage.getItem(CALENDAR_KEY);
+      if (!stored) {
+        return DEFAULT_CALENDAR;
+      }
+      try {
+        const parsed = JSON.parse(stored) as Partial<CalendarConnections>;
+        return {
+          google: Boolean(parsed?.google),
+          outlook: Boolean(parsed?.outlook),
+        };
+      } catch (error) {
+        console.error("Failed to parse calendar connections:", error);
+      }
+      return DEFAULT_CALENDAR;
+    });
 
   useEffect(() => {
     if (githubToken) {
@@ -677,8 +808,134 @@ function DashboardPage({ githubToken }: { githubToken: string | null }) {
     }
   }, [githubToken]);
 
+  useEffect(() => {
+    localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklist));
+  }, [checklist]);
+
+  useEffect(() => {
+    localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  }, [goals]);
+
+  useEffect(() => {
+    localStorage.setItem(NOTES_KEY, notes);
+  }, [notes]);
+
+  useEffect(() => {
+    localStorage.setItem(CALENDAR_KEY, JSON.stringify(calendarConnections));
+  }, [calendarConnections]);
+
+  useEffect(() => {
+    if (!isTimerRunning) {
+      return;
+    }
+    const timerId = window.setInterval(() => {
+      setSecondsLeft((current) => (current > 0 ? current - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timerId);
+  }, [isTimerRunning]);
+
+  useEffect(() => {
+    if (!isTimerRunning || secondsLeft !== 0) {
+      return;
+    }
+    const nextMode = timerMode === "focus" ? "break" : "focus";
+    setTimerMode(nextMode);
+    setSecondsLeft(nextMode === "focus" ? FOCUS_DURATION : BREAK_DURATION);
+  }, [isTimerRunning, secondsLeft, timerMode]);
+
   const maxWeeklyCommits = Math.max(...weeklyCommits.map((entry) => entry.commits));
   const totalCommits = weeklyCommits.reduce((sum, entry) => sum + entry.commits, 0);
+  const remainingTasks = checklist.filter((task) => !task.done).length;
+  const completedTasks = checklist.length - remainingTasks;
+  const averageGoalProgress = goals.length
+    ? Math.round(
+        goals.reduce((sum, goal) => sum + goal.progress, 0) / goals.length
+      )
+    : 0;
+  const isCalendarConnected =
+    calendarConnections.google || calendarConnections.outlook;
+  const totalSeconds = timerMode === "focus" ? FOCUS_DURATION : BREAK_DURATION;
+  const progress = totalSeconds
+    ? ((totalSeconds - secondsLeft) / totalSeconds) * 100
+    : 0;
+
+  const formatTime = (value: number) => {
+    const minutes = Math.floor(value / 60);
+    const seconds = value % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
+  const handleToggleTimer = () => {
+    if (secondsLeft === 0) {
+      setSecondsLeft(timerMode === "focus" ? FOCUS_DURATION : BREAK_DURATION);
+    }
+    setIsTimerRunning((current) => !current);
+  };
+
+  const handleResetTimer = () => {
+    setIsTimerRunning(false);
+    setTimerMode("focus");
+    setSecondsLeft(FOCUS_DURATION);
+  };
+
+  const handleSkipTimer = () => {
+    const nextMode = timerMode === "focus" ? "break" : "focus";
+    setTimerMode(nextMode);
+    setSecondsLeft(nextMode === "focus" ? FOCUS_DURATION : BREAK_DURATION);
+  };
+
+  const handleAddTask = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = newTask.trim();
+    if (!trimmed) {
+      return;
+    }
+    const id = window.crypto?.randomUUID
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setChecklist((current) => [{ id, label: trimmed, done: false }, ...current]);
+    setNewTask("");
+  };
+
+  const handleAddGoal = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = newGoal.trim();
+    if (!trimmed) {
+      return;
+    }
+    const id = window.crypto?.randomUUID
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setGoals((current) => [{ id, title: trimmed, progress: 0 }, ...current]);
+    setNewGoal("");
+  };
+
+  const handleGoalProgress = (id: string, value: number) => {
+    setGoals((current) =>
+      current.map((goal) =>
+        goal.id === id ? { ...goal, progress: value } : goal
+      )
+    );
+  };
+
+  const handleToggleTask = (id: string) => {
+    setChecklist((current) =>
+      current.map((task) =>
+        task.id === id ? { ...task, done: !task.done } : task
+      )
+    );
+  };
+
+  const handleClearCompleted = () => {
+    setChecklist((current) => current.filter((task) => !task.done));
+  };
+
+  const handleToggleCalendar = (provider: keyof CalendarConnections) => {
+    setCalendarConnections((current) => ({
+      ...current,
+      [provider]: !current[provider],
+    }));
+  };
 
   const linePoints = useMemo(() => {
     const maxHours = Math.max(...codingHours);
@@ -747,6 +1004,216 @@ function DashboardPage({ githubToken }: { githubToken: string | null }) {
             <strong>{card.value}</strong>
           </article>
         ))}
+      </section>
+
+      <section className="productivity-grid">
+        <article className="panel quick-actions">
+          <div className="panel-head">
+            <h3>Productivity launchpad</h3>
+            <span>Quick actions</span>
+          </div>
+          <div className="action-grid">
+            {quickActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className="action-card"
+                onClick={() => navigate(action.path)}
+              >
+                <div className="action-title">
+                  <action.icon size={18} />
+                  <strong>{action.label}</strong>
+                </div>
+                <p>{action.description}</p>
+              </button>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel focus-card">
+          <div className="panel-head">
+            <h3>Focus timer</h3>
+            <span>{timerMode === "focus" ? "Focus" : "Break"}</span>
+          </div>
+          <div className="focus-timer">
+            <p className="timer-subtitle">
+              {timerMode === "focus"
+                ? "Deep work sprint"
+                : "Reset and breathe"}
+            </p>
+            <strong className="timer-display">{formatTime(secondsLeft)}</strong>
+            <div className="timer-bar">
+              <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+            </div>
+          </div>
+          <div className="timer-actions">
+            <button className="btn btn-primary" type="button" onClick={handleToggleTimer}>
+              {isTimerRunning ? "Pause" : "Start"}
+            </button>
+            <button className="btn btn-ghost" type="button" onClick={handleResetTimer}>
+              Reset
+            </button>
+            <button className="btn btn-ghost" type="button" onClick={handleSkipTimer}>
+              Skip
+            </button>
+          </div>
+        </article>
+
+        <article className="panel checklist-card">
+          <div className="panel-head">
+            <h3>Daily checklist</h3>
+            <span>{remainingTasks} open</span>
+          </div>
+          <form className="checklist-form" onSubmit={handleAddTask}>
+            <input
+              type="text"
+              placeholder="Add a new task"
+              value={newTask}
+              onChange={(event) => setNewTask(event.target.value)}
+            />
+            <button className="btn btn-primary" type="submit">
+              Add
+            </button>
+          </form>
+          <ul className="checklist-list">
+            {checklist.map((task) => (
+              <li
+                key={task.id}
+                className={`checklist-item ${task.done ? "done" : ""}`}
+              >
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={task.done}
+                    onChange={() => handleToggleTask(task.id)}
+                  />
+                  <span>{task.label}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="checklist-footer">
+            <span className="checklist-meta">
+              {completedTasks} complete
+            </span>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={handleClearCompleted}
+              disabled={completedTasks === 0}
+            >
+              Clear completed
+            </button>
+          </div>
+        </article>
+
+        <article className="panel goals-card">
+          <div className="panel-head">
+            <h3>Goal tracking</h3>
+            <span>{averageGoalProgress}% on track</span>
+          </div>
+          <form className="goals-form" onSubmit={handleAddGoal}>
+            <input
+              type="text"
+              placeholder="Add a goal"
+              value={newGoal}
+              onChange={(event) => setNewGoal(event.target.value)}
+            />
+            <button className="btn btn-primary" type="submit">
+              Add
+            </button>
+          </form>
+          <div className="goals-list">
+            {goals.map((goal) => (
+              <div key={goal.id} className="goal-row">
+                <div className="goal-title">
+                  <strong>{goal.title}</strong>
+                  <span>{goal.progress}%</span>
+                </div>
+                <div className="goal-bar">
+                  <span style={{ width: `${goal.progress}%` }} />
+                </div>
+                <input
+                  className="goal-range"
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={goal.progress}
+                  onChange={(event) =>
+                    handleGoalProgress(goal.id, Number(event.target.value))
+                  }
+                  aria-label={`Progress for ${goal.title}`}
+                />
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel calendar-card">
+          <div className="panel-head">
+            <h3>Calendar sync</h3>
+            <span>{isCalendarConnected ? "Connected" : "Not connected"}</span>
+          </div>
+          <div className="calendar-actions">
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => handleToggleCalendar("google")}
+            >
+              {calendarConnections.google
+                ? "Disconnect Google"
+                : "Connect Google"}
+            </button>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => handleToggleCalendar("outlook")}
+            >
+              {calendarConnections.outlook
+                ? "Disconnect Outlook"
+                : "Connect Outlook"}
+            </button>
+          </div>
+          <p className="calendar-helper">
+            Block focus time and keep review windows visible.
+          </p>
+          <div className="calendar-list">
+            {upcomingEvents.map((event) => (
+              <div key={event.id} className="calendar-item">
+                <span className="calendar-time">{event.time}</span>
+                <div className="calendar-details">
+                  <strong>{event.title}</strong>
+                  <span className="calendar-tag">{event.tag}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel notes-card">
+          <div className="panel-head">
+            <h3>Personal notes</h3>
+            <span>Autosaved</span>
+          </div>
+          <textarea
+            className="notes-textarea"
+            placeholder="Capture decisions, ideas, or next steps..."
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
+          <div className="notes-meta">
+            <span>{notes.length ? `${notes.length} chars` : "Empty"}</span>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => setNotes("")}
+              disabled={!notes.trim()}
+            >
+              Clear
+            </button>
+          </div>
+        </article>
       </section>
 
       <section className="dashboard-grid">
